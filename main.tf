@@ -8,3 +8,11 @@ module "vpc" {
   project_name = var.project_name
   environment  = var.environment
 }
+
+module "iam" {
+  source = "./iam"
+
+  region       = var.region
+  project_name = var.project_name
+  environment  = var.environment
+}
