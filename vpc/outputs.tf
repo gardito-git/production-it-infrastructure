@@ -22,3 +22,8 @@ output "private_subnet_ids" {
     aws_route_table_association.private,
   ]
 }
+
+# Same order as private_subnet_ids (a, b, c).
+output "private_subnet_cidrs" {
+  value = [for s in aws_subnet.private : s.cidr_block]
+}
