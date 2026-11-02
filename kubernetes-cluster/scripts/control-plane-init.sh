@@ -45,8 +45,6 @@ controlPlaneEndpoint: "$CONTROL_PLANE_ENDPOINT:6443"
 apiServer:
   certSANs:
     - "$CONTROL_PLANE_ENDPOINT"
-    - "127.0.0.1" # for kubectl through an SSM port-forward
-    - "localhost"
 networking:
   podSubnet: $POD_CIDR
   serviceSubnet: $SERVICE_CIDR

@@ -46,10 +46,12 @@ Expect about 10–15 minutes from `terraform apply` to all nodes `Ready`.
 
 ## Watching the bootstrap
 
-Every node logs to `/var/log/k8s-bootstrap.log`. Open a shell with SSM (no SSH key needed):
+Every node logs to `/var/log/k8s-bootstrap.log`. Connect your OpenVPN client
+(see [vpc/README.md](../../vpc/README.md)), then SSH to the node's private IP
+(`terraform output` lists them):
 
 ```bash
-aws ssm start-session --target <instance-id>
+ssh ubuntu@<private-ip>
 sudo tail -f /var/log/k8s-bootstrap.log
 ```
 
@@ -65,16 +67,16 @@ The etcd nodes are not Kubernetes nodes, so they don't appear in `kubectl get no
 
 ## kubectl from your laptop
 
-The API is only reachable inside the VPC. Forward it through a control-plane node with SSM:
+The API is only reachable inside the VPC, so connect the VPN first. The VPN uses the
+VPC's DNS, so the internal load balancer name in the kubeconfig resolves as-is:
 
 ```bash
-aws ssm start-session --target <control-plane-instance-id> \
-  --document-name AWS-StartPortForwardingSessionToRemoteHost \
-  --parameters "host=<kubernetes_api_endpoint>,portNumber=6443,localPortNumber=6443"
+mkdir -p ~/.kube
+ssh ubuntu@<control-plane-1-ip> sudo cat /etc/kubernetes/admin.conf > ~/.kube/config
+kubectl get nodes
 ```
 
-Copy `/etc/kubernetes/admin.conf` from control-plane-1 to your laptop, change `server:` to
-`https://127.0.0.1:6443`, and use it as your kubeconfig. Treat it like a root password.
+`admin.conf` is full cluster-admin access. Treat it like a root password.
 
 ## After the cluster is up: delete the bootstrap secrets
 

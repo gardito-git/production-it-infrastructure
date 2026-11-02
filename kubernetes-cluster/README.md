@@ -14,7 +14,7 @@ boot, so `terraform apply` is the only step.
 
 ```
                       ┌──────────────── VPC (private subnets a, b, c) ────────────────┐
-  kubectl ──SSM──►    │  Internal NLB :6443                                           │
+  you ──OpenVPN──►    │  Client VPN ──► Internal NLB :6443 (kubectl), any node :22    │
                       │     │                                                         │
                       │     ├──► control-plane-1 ─┐                                   │
                       │     ├──► control-plane-2 ─┼──► etcd-1, etcd-2, etcd-3 :2379   │
@@ -24,8 +24,9 @@ boot, so `terraform apply` is the only step.
                       └──────────────── internet via NAT gateway ─────────────────────┘
 ```
 
-- **All nodes are in private subnets** with no public IPs. Shell access is through
-  SSM Session Manager; no SSH keys or bastion needed.
+- **All nodes are in private subnets** with no public IPs. You reach them by connecting
+  the AWS Client VPN (see [vpc/README.md](../vpc/README.md)) and SSHing to their private
+  IPs as `ubuntu`. Port 22 accepts connections only from the VPN.
 - **Nodes are spread round-robin across the 3 AZs**, so one AZ outage leaves 2 of 3
   control-plane and etcd members running (etcd keeps quorum).
 - **etcd runs separately from the control plane** ("external etcd"), so a busy
@@ -69,6 +70,9 @@ module "kubernetes_cluster" {
 
   instance_profile_names = module.iam.node_instance_profile_names
   node_role_names        = module.iam.node_role_names
+
+  ssh_public_key               = var.ssh_public_key
+  ssh_source_security_group_id = module.vpc.vpn_security_group_id
 }
 ```
 
@@ -84,7 +88,8 @@ module "kubernetes_cluster" {
 | `private_subnet_cidrs` | (required) | Same order as `private_subnet_ids`; used for the fixed etcd IPs |
 | `instance_profile_names` | (required) | Map with keys `control-plane`, `worker`, `etcd` |
 | `node_role_names` | (required) | Map with the same keys; each role gets access to the bootstrap bucket |
-| `key_name` | `null` | Optional EC2 key pair. Leave unset and use SSM |
+| `ssh_public_key` | (required) | Public key installed for user `ubuntu` on every node |
+| `ssh_source_security_group_id` | (required) | Group allowed to SSH in: the VPN endpoint's |
 | `kubernetes_version` | `"1.37"` | Kubernetes minor version |
 | `cilium_version` | `"1.20.4"` | Cilium version |
 | `cilium_cli_version` | `"0.20.2"` | cilium-cli version used to install Cilium |
@@ -97,7 +102,7 @@ module "kubernetes_cluster" {
 |---|---|
 | `api_endpoint` | Internal NLB DNS name for the API server (port 6443) |
 | `bootstrap_bucket` | Name of the bootstrap S3 bucket |
-| `control_plane_instance_ids` | Instance IDs, for SSM sessions and port-forwarding |
+| `control_plane_instance_ids` | Control-plane instance IDs |
 | `control_plane_private_ips` / `worker_private_ips` / `etcd_private_ips` | Private IPs per role |
 
 ## Deploying
@@ -109,10 +114,11 @@ terraform plan
 terraform apply
 ```
 
-After about 10–15 minutes all nodes should be `Ready`. To check, open a shell on control-plane-1:
+After about 10–15 minutes all nodes should be `Ready`. To check, connect the VPN and
+SSH to control-plane-1 (its IP is the first entry of `terraform output control_plane_private_ips`):
 
 ```bash
-aws ssm start-session --target "$(terraform output -json control_plane_instance_ids | jq -r '.[0]')"
+ssh ubuntu@<control-plane-1-ip>
 sudo kubectl get nodes -o wide
 ```
 

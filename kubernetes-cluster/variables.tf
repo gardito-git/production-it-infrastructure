@@ -41,10 +41,14 @@ variable "node_role_names" {
   description = "IAM role per node type, given access to the bootstrap bucket (module.iam.node_role_names)"
 }
 
-variable "key_name" {
+variable "ssh_public_key" {
   type        = string
-  default     = null
-  description = "Optional EC2 key pair name. Leave null and use SSM Session Manager instead."
+  description = "SSH public key installed on every node for user \"ubuntu\""
+}
+
+variable "ssh_source_security_group_id" {
+  type        = string
+  description = "Security group allowed to SSH to the nodes: the VPN endpoint's (module.vpc.vpn_security_group_id)"
 }
 
 variable "kubernetes_version" {

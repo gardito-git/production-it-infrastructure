@@ -57,6 +57,13 @@ if ! command -v aws >/dev/null; then
   snap install aws-cli --classic
 fi
 
+# Ubuntu's AWS images ship the SSM agent. Access is SSH over the VPN instead,
+# so remove it rather than leave an unused agent running.
+if snap list amazon-ssm-agent >/dev/null 2>&1; then
+  log "Removing the AWS SSM agent"
+  snap remove amazon-ssm-agent
+fi
+
 if [[ $NODE_ROLE == etcd ]]; then
   # etcd nodes aren't part of the cluster. kubelet runs standalone there,
   # only to keep the etcd static pod running (kubeadm's external etcd setup).

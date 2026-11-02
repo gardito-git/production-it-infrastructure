@@ -52,6 +52,13 @@ locals {
   }
 }
 
+# Your public key, installed for user "ubuntu" on every node.
+# Connect to the VPN, then: ssh ubuntu@<private-ip>
+resource "aws_key_pair" "nodes" {
+  key_name   = "${local.name_prefix}-nodes"
+  public_key = var.ssh_public_key
+}
+
 # The nodes bootstrap themselves at first boot (see scripts/README.md):
 #   etcd-1 creates certs -> etcd-2/3 start -> control-plane-1 runs kubeadm init
 #   -> control-plane-2/3 and the workers join.
@@ -66,7 +73,7 @@ resource "aws_instance" "control_plane" {
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ, round-robin
   vpc_security_group_ids      = [aws_security_group.control_plane.id]
   iam_instance_profile        = var.instance_profile_names["control-plane"]
-  key_name                    = var.key_name
+  key_name                    = aws_key_pair.nodes.key_name
   associate_public_ip_address = false
 
   # IMDSv2 only; hop limit 1 keeps pods from reaching the metadata service.
@@ -114,7 +121,7 @@ resource "aws_instance" "worker" {
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ, round-robin
   vpc_security_group_ids      = [aws_security_group.worker.id]
   iam_instance_profile        = var.instance_profile_names["worker"]
-  key_name                    = var.key_name
+  key_name                    = aws_key_pair.nodes.key_name
   associate_public_ip_address = false
 
   # IMDSv2 only; hop limit 1 keeps pods from reaching the metadata service.
@@ -163,7 +170,7 @@ resource "aws_instance" "etcd" {
   private_ip                  = local.etcd_ips[count.index]
   vpc_security_group_ids      = [aws_security_group.etcd.id]
   iam_instance_profile        = var.instance_profile_names["etcd"]
-  key_name                    = var.key_name
+  key_name                    = aws_key_pair.nodes.key_name
   associate_public_ip_address = false
 
   # IMDSv2 only; hop limit 1 keeps pods from reaching the metadata service.

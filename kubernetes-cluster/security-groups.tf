@@ -69,6 +69,22 @@ resource "aws_vpc_security_group_ingress_rule" "icmp" {
   description       = "ICMP from the VPC"
 }
 
+# SSH on all three groups, only from people connected to the VPN.
+resource "aws_vpc_security_group_ingress_rule" "ssh_from_vpn" {
+  for_each = {
+    control_plane = aws_security_group.control_plane.id
+    worker        = aws_security_group.worker.id
+    etcd          = aws_security_group.etcd.id
+  }
+
+  security_group_id            = each.value
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = var.ssh_source_security_group_id
+  description                  = "SSH from VPN clients"
+}
+
 # Control plane
 
 resource "aws_vpc_security_group_ingress_rule" "control_plane_api" {
@@ -77,7 +93,7 @@ resource "aws_vpc_security_group_ingress_rule" "control_plane_api" {
   from_port         = 6443
   to_port           = 6443
   cidr_ipv4         = var.vpc_cidr
-  description       = "kube-apiserver from the NLB, nodes and SSM port-forwards"
+  description       = "kube-apiserver from the NLB, nodes and kubectl over the VPN"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "control_plane_self" {

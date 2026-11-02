@@ -7,14 +7,13 @@ locals {
   # (e.g. workers must not read the etcd private keys in the bootstrap bucket).
   node_roles = toset(["control-plane", "worker", "etcd"])
 
+  # Shell access is SSH over the VPN (vpc/vpn.tf), so no SSM policy here.
   managed_policies = {
-    # Lets you open a shell on private nodes through SSM Session Manager, no SSH key needed.
-    ssm = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
     # Lets containerd pull images from ECR.
     ecr_read = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   }
 
-  # Every role/policy pair, keyed like "worker/ssm".
+  # Every role/policy pair, keyed like "worker/ecr_read".
   role_policy_attachments = {
     for pair in setproduct(local.node_roles, keys(local.managed_policies)) :
     "${pair[0]}/${pair[1]}" => { role = pair[0], policy_arn = local.managed_policies[pair[1]] }
