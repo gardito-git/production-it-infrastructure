@@ -1,5 +1,145 @@
-TO-DO
-# Manual Cluster with EC2, multiple control-plane and workers with external etcd
-I don't know why someone ask me to do this, but clearly for saving-cost purpose after using too much AWS EKS
+# Kubernetes cluster on EC2 (kubeadm + external etcd)
 
-# TO-DO
+A self-managed, highly available Kubernetes cluster on plain EC2, as an alternative
+to Amazon EKS to reduce cost. The nodes bootstrap themselves with `kubeadm` at first
+boot, so `terraform apply` is the only step.
+
+## Architecture
+
+| Role | Count | Instance type | Root disk | Security group |
+|---|---|---|---|---|
+| Control plane | 3 | `c8i.xlarge` | 30 GB gp3 | `control-plane` |
+| Worker | 6 | `r8i.xlarge` | 100 GB gp3 | `worker` |
+| External etcd | 3 | `c8i.large` | 30 GB gp3 | `etcd` |
+
+```
+                      ┌──────────────── VPC (private subnets a, b, c) ────────────────┐
+  kubectl ──SSM──►    │  Internal NLB :6443                                           │
+                      │     │                                                         │
+                      │     ├──► control-plane-1 ─┐                                   │
+                      │     ├──► control-plane-2 ─┼──► etcd-1, etcd-2, etcd-3 :2379   │
+                      │     └──► control-plane-3 ─┘    (fixed IPs, .10 in each subnet)│
+                      │                                                               │
+                      │  worker-1 … worker-6 ──► NLB :6443                            │
+                      └──────────────── internet via NAT gateway ─────────────────────┘
+```
+
+- **All nodes are in private subnets** with no public IPs. Shell access is through
+  SSM Session Manager; no SSH keys or bastion needed.
+- **Nodes are spread round-robin across the 3 AZs**, so one AZ outage leaves 2 of 3
+  control-plane and etcd members running (etcd keeps quorum).
+- **etcd runs separately from the control plane** ("external etcd"), so a busy
+  API server can't starve etcd, and the two can be scaled and backed up independently.
+- **The API server sits behind an internal NLB**, which is kubeadm's `controlPlaneEndpoint`.
+  Every node and kubectl uses it, so any control-plane node can fail.
+
+| Component | Version |
+|---|---|
+| OS | Ubuntu 24.04 LTS |
+| Kubernetes | 1.37 (`kubernetes_version`) |
+| Container runtime | containerd (Ubuntu package) |
+| CNI | Cilium 1.20.4 (`cilium_version`) |
+
+## Files
+
+| File | What's in it |
+|---|---|
+| `compute.tf` | Ubuntu AMI lookup, the 12 EC2 instances and their user data |
+| `security-groups.tf` | Security groups and rules for control plane, workers and etcd |
+| `nlb.tf` | Internal NLB, target group and listener for the API server |
+| `bootstrap-bucket.tf` | Private S3 bucket the nodes use to share certs and join commands, plus per-role IAM access to it |
+| `variables.tf` / `outputs.tf` | Module inputs and outputs |
+| `scripts/` | Bootstrap scripts that run on the nodes. See [scripts/README.md](scripts/README.md) |
+
+## Usage
+
+Called from the root `main.tf`:
+
+```hcl
+module "kubernetes_cluster" {
+  source = "./kubernetes-cluster"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id               = module.vpc.vpc_id
+  vpc_cidr             = module.vpc.vpc_cidr
+  private_subnet_ids   = module.vpc.private_subnet_ids
+  private_subnet_cidrs = module.vpc.private_subnet_cidrs
+
+  instance_profile_names = module.iam.node_instance_profile_names
+  node_role_names        = module.iam.node_role_names
+}
+```
+
+### Inputs
+
+| Name | Default | Description |
+|---|---|---|
+| `project_name` | (required) | Used in resource names and as the Kubernetes cluster name |
+| `environment` | (required) | Used in resource names |
+| `vpc_id` | (required) | VPC for the security groups and NLB target group |
+| `vpc_cidr` | (required) | Allowed to reach the API server, NodePorts and ICMP |
+| `private_subnet_ids` | (required) | Subnets the nodes and the NLB are placed in |
+| `private_subnet_cidrs` | (required) | Same order as `private_subnet_ids`; used for the fixed etcd IPs |
+| `instance_profile_names` | (required) | Map with keys `control-plane`, `worker`, `etcd` |
+| `node_role_names` | (required) | Map with the same keys; each role gets access to the bootstrap bucket |
+| `key_name` | `null` | Optional EC2 key pair. Leave unset and use SSM |
+| `kubernetes_version` | `"1.37"` | Kubernetes minor version |
+| `cilium_version` | `"1.20.4"` | Cilium version |
+| `cilium_cli_version` | `"0.20.2"` | cilium-cli version used to install Cilium |
+| `pod_cidr` | `"10.244.0.0/16"` | Pod IPs. Must not overlap the VPC or `service_cidr` |
+| `service_cidr` | `"10.96.0.0/12"` | ClusterIP services. Must not overlap the VPC or `pod_cidr` |
+
+### Outputs
+
+| Name | Description |
+|---|---|
+| `api_endpoint` | Internal NLB DNS name for the API server (port 6443) |
+| `bootstrap_bucket` | Name of the bootstrap S3 bucket |
+| `control_plane_instance_ids` | Instance IDs, for SSM sessions and port-forwarding |
+| `control_plane_private_ips` / `worker_private_ips` / `etcd_private_ips` | Private IPs per role |
+
+## Deploying
+
+From the root folder:
+
+```bash
+terraform plan
+terraform apply
+```
+
+After about 10–15 minutes all nodes should be `Ready`. To check, open a shell on control-plane-1:
+
+```bash
+aws ssm start-session --target "$(terraform output -json control_plane_instance_ids | jq -r '.[0]')"
+sudo kubectl get nodes -o wide
+```
+
+Then **delete the bootstrap secrets** (etcd keys, join tokens) from S3:
+
+```bash
+aws s3 rm "s3://$(terraform output -raw kubernetes_bootstrap_bucket)" --recursive
+```
+
+Watching the logs, using kubectl from your laptop and fixing a failed bootstrap are
+all covered in [scripts/README.md](scripts/README.md).
+
+## Things to know
+
+- **Changing `user_data` or the AMI never replaces a running node.** Both are in
+  `ignore_changes`, so script and AMI updates only reach newly created nodes.
+- **Changing an etcd node's subnet or IP replaces it.** etcd members have fixed IPs;
+  replacing one means removing and re-adding the member with `etcdctl`.
+- **Self-managed means you own the control plane.** With EKS, AWS runs, patches and
+  backs up the control plane and etcd. Here that's your job (see the TO-DO list).
+
+## TO-DO
+
+- [ ] etcd backups: scheduled `etcdctl snapshot save` to a versioned S3 bucket
+- [ ] AWS cloud controller manager, for `type: LoadBalancer` Services
+- [ ] AWS EBS CSI driver, for PersistentVolumes
+- [ ] Monitoring and logging (e.g. kube-prometheus-stack + a log shipper)
+- [ ] Upgrade runbook (`kubeadm upgrade`, one minor version at a time)
+- [ ] Node replacement runbook (new join tokens, etcd member replacement)
+- [ ] Remote Terraform state (S3 backend with locking)
