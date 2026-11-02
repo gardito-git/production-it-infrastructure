@@ -7,6 +7,8 @@ module "vpc" {
   region       = var.region
   project_name = var.project_name
   environment  = var.environment
+
+  vpn_client_names = var.vpn_client_names
 }
 
 module "iam" {
@@ -29,4 +31,7 @@ module "kubernetes_cluster" {
 
   instance_profile_names = module.iam.node_instance_profile_names
   node_role_names        = module.iam.node_role_names
+
+  ssh_public_key               = var.ssh_public_key
+  ssh_source_security_group_id = module.vpc.vpn_security_group_id
 }

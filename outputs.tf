@@ -12,6 +12,17 @@ output "private_subnet_ids" {
   value = module.vpc.private_subnet_ids
 }
 
+output "vpn_endpoint_id" {
+  value = module.vpc.vpn_endpoint_id
+}
+
+# Save a profile with:
+#   terraform output -json vpn_client_configs | jq -r '.admin' > admin.ovpn
+output "vpn_client_configs" {
+  value     = module.vpc.vpn_client_configs
+  sensitive = true
+}
+
 output "kubernetes_api_endpoint" {
   value = module.kubernetes_cluster.api_endpoint
 }
