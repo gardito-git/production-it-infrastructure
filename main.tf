@@ -1,5 +1,5 @@
-# Root module: run terraform from this folder. It calls the vpc module and
-# passes the root variables into it.
+# Root module: run terraform from this folder. It calls each module and wires
+# one module's outputs into the next module's inputs.
 
 module "vpc" {
   source = "./vpc"
@@ -12,7 +12,18 @@ module "vpc" {
 module "iam" {
   source = "./iam"
 
-  region       = var.region
   project_name = var.project_name
   environment  = var.environment
+}
+
+module "kubernetes_cluster" {
+  source = "./kubernetes-cluster"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id                = module.vpc.vpc_id
+  vpc_cidr              = module.vpc.vpc_cidr
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  instance_profile_name = module.iam.node_instance_profile_name
 }
