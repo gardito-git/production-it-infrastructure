@@ -1,0 +1,30 @@
+#!/bin/bash
+# Terraform renders this template once per instance (templatefile in compute.tf).
+# It writes the node's settings and the scripts from this folder to disk, then
+# runs bootstrap.sh. Output goes to /var/log/k8s-bootstrap.log.
+set -euo pipefail
+mkdir -p /etc/k8s-bootstrap /opt/k8s-bootstrap
+
+cat >/etc/k8s-bootstrap/env <<'K8S_ENV_EOF'
+NODE_ROLE="${node_role}"
+NODE_INDEX="${node_index}"
+CLUSTER_NAME="${cluster_name}"
+AWS_REGION="${aws_region}"
+BOOTSTRAP_BUCKET="${bootstrap_bucket}"
+KUBERNETES_VERSION="${kubernetes_version}"
+CONTROL_PLANE_ENDPOINT="${control_plane_endpoint}"
+ETCD_IPS="${etcd_ips}"
+POD_CIDR="${pod_cidr}"
+SERVICE_CIDR="${service_cidr}"
+CILIUM_VERSION="${cilium_version}"
+CILIUM_CLI_VERSION="${cilium_cli_version}"
+K8S_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/k8s-bootstrap/${name} <<'K8S_SCRIPT_EOF'
+${body}
+K8S_SCRIPT_EOF
+chmod 0750 /opt/k8s-bootstrap/${name}
+
+%{ endfor ~}
+/opt/k8s-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/k8s-bootstrap.log
