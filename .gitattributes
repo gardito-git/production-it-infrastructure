@@ -1,0 +1,4 @@
+# Shell scripts and templates run on Linux nodes: always keep LF line endings,
+# even on Windows with core.autocrlf=true.
+*.sh    text eol=lf
+*.tftpl text eol=lf
