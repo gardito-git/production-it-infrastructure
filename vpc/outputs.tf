@@ -27,3 +27,18 @@ output "private_subnet_ids" {
 output "private_subnet_cidrs" {
   value = [for s in aws_subnet.private : s.cidr_block]
 }
+
+# Security groups allow SSH from this group, i.e. from connected VPN clients.
+output "vpn_security_group_id" {
+  value = aws_security_group.vpn.id
+}
+
+output "vpn_endpoint_id" {
+  value = aws_ec2_client_vpn_endpoint.vpn.id
+}
+
+# Map of client name => .ovpn profile. Contains private keys.
+output "vpn_client_configs" {
+  value     = local.vpn_client_configs
+  sensitive = true
+}

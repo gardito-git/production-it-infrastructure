@@ -20,3 +20,6 @@ override.tf.json
 terraform.rc
 
 *tfplan*
+
+# VPN profiles contain a private key
+*.ovpn
