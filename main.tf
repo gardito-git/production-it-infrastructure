@@ -22,8 +22,11 @@ module "kubernetes_cluster" {
   project_name = var.project_name
   environment  = var.environment
 
-  vpc_id                = module.vpc.vpc_id
-  vpc_cidr              = module.vpc.vpc_cidr
-  private_subnet_ids    = module.vpc.private_subnet_ids
-  instance_profile_name = module.iam.node_instance_profile_name
+  vpc_id               = module.vpc.vpc_id
+  vpc_cidr             = module.vpc.vpc_cidr
+  private_subnet_ids   = module.vpc.private_subnet_ids
+  private_subnet_cidrs = module.vpc.private_subnet_cidrs
+
+  instance_profile_names = module.iam.node_instance_profile_names
+  node_role_names        = module.iam.node_role_names
 }
