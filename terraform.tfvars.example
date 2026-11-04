@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (git-ignored) and fill in your values.
+
+# Contents of your PUBLIC key file, e.g. ~/.ssh/id_ed25519.pub (never the private key).
+# Create one with: ssh-keygen -t ed25519
+ssh_public_key = "ssh-ed25519 AAAA... you@laptop"
+
+# One OpenVPN profile is created per name.
+vpn_client_names = ["admin"]
