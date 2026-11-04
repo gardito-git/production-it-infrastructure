@@ -8,7 +8,6 @@ locals {
   node_roles = toset(["control-plane", "worker", "etcd"])
 
   # Shell access is SSH over the VPN (vpc/vpn.tf), so no SSM policy here.
-  managed_policies = {
     # Lets containerd pull images from ECR.
     ecr_read = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   }
