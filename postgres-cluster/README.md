@@ -152,6 +152,3 @@ RDS Multi-AZ at the same size before deciding; RDS includes backups, patching an
 - [ ] TLS for client connections (`ssl = on` with a certificate; `sslmode=require` in apps)
 - [ ] TLS between etcd members (now plain HTTP, limited to this security group)
 - [ ] Monitoring: postgres_exporter + alerts on replication lag, failovers, backup age
-- [ ] Connection pooling (PgBouncer) if apps open many connections
-- [ ] Scheduled restore test
-- [ ] Private DNS name (Route 53) for the endpoint, e.g. `postgres.prod.example.internal`
