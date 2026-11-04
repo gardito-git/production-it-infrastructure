@@ -1,0 +1,52 @@
+#!/bin/bash
+# First-boot script (user data), rendered by templatefile() in compute.tf.
+# Installs Nginx, a test page that shows which server answered, and /healthz
+# for the load balancer. Output goes to /var/log/web-server-bootstrap.log.
+set -euo pipefail
+exec > >(tee -a /var/log/web-server-bootstrap.log) 2>&1
+export DEBIAN_FRONTEND=noninteractive
+
+# Ubuntu's AWS images ship the SSM agent. Access is SSH over the VPN instead.
+if snap list amazon-ssm-agent >/dev/null 2>&1; then
+  snap remove amazon-ssm-agent
+fi
+
+# Retry in case the NAT route isn't usable yet at the very first boot.
+for attempt in {1..30}; do
+  apt-get -o DPkg::Lock::Timeout=600 update -q && break
+  echo "apt-get update failed (attempt $attempt), retrying"
+  sleep 10
+done
+apt-get -o DPkg::Lock::Timeout=600 install -y -q nginx
+
+# Identify the server on the test page, so you can see the ALB rotating between them.
+TOKEN=$(curl -sf -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+meta() { curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/$1"; }
+INSTANCE_ID=$(meta instance-id)
+AZ=$(meta placement/availability-zone)
+
+cat >/var/www/html/index.html <<EOF
+<!doctype html>
+<title>$(hostname)</title>
+<h1>It works</h1>
+<p>Served by <b>$(hostname)</b> ($INSTANCE_ID) in <b>$AZ</b>.</p>
+EOF
+
+# The load balancer's health check: GET /healthz -> 200 "ok".
+echo ok >/var/www/html/healthz
+
+# Requests arrive from the ALB's private IPs. Trust its X-Forwarded-For header
+# (only from inside the VPC) so logs and apps see the real visitor IP.
+cat >/etc/nginx/conf.d/real-ip.conf <<'EOF'
+set_real_ip_from ${vpc_cidr};
+real_ip_header X-Forwarded-For;
+real_ip_recursive on;
+EOF
+
+# Don't reveal the Nginx version in headers and error pages.
+sed -i 's/# server_tokens off;/server_tokens off;/' /etc/nginx/nginx.conf
+
+nginx -t
+systemctl enable nginx
+systemctl reload-or-restart nginx
+echo "Nginx is running"
