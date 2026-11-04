@@ -3,7 +3,7 @@
 #   logs/      deleted after var.log_retention_days
 #   backups/   deleted after var.backup_retention_days, e.g. backups/kubernetes/etcd/
 #   tmp/       deleted after 7 days
-#   anything else (uploads/, frontend/, ...) is kept until someone deletes it.
+#   anything else (uploads/, web/, ...) is kept until someone deletes it.
 #
 # S3 has no real folders: a prefix appears as soon as an object is written under it,
 # so there is nothing to create here in advance.
@@ -73,8 +73,8 @@ resource "aws_s3_bucket_versioning" "private" {
 locals {
   # prefix => days until objects under it are deleted
   private_expiring_prefixes = {
-    "logs/"    = 30
-    "backups/" = 30
+    "logs/"    = var.log_retention_days
+    "backups/" = var.backup_retention_days
     "tmp/"     = 7
   }
 }

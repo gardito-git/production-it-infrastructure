@@ -68,18 +68,18 @@ output "private_bucket_name" {
   value = module.s3.private_bucket_name
 }
 
-output "frontend_bucket_name" {
-  value = module.s3.frontend_bucket_name
+output "public_bucket_name" {
+  value = module.s3.public_bucket_name
 }
 
-output "frontend_cdn_domain" {
-  value = module.s3.frontend_cdn_domain
+output "public_cdn_domain" {
+  value = module.s3.public_cdn_domain
 }
 
-output "frontend_cdn_distribution_id" {
-  value = module.s3.frontend_cdn_distribution_id
+output "public_cdn_distribution_id" {
+  value = module.s3.public_cdn_distribution_id
 }
 
-output "frontend_developers_group" {
-  value = module.s3.frontend_developers_group
+output "web_developers_group" {
+  value = module.s3.web_developers_group
 }

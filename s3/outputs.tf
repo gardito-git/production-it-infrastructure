@@ -9,21 +9,21 @@ output "private_bucket_arn" {
   value       = aws_s3_bucket.private.arn
 }
 
-output "frontend_bucket_name" {
-  value = aws_s3_bucket.frontend.id
+output "public_bucket_name" {
+  value = aws_s3_bucket.public.id
 }
 
-output "frontend_cdn_domain" {
-  description = "Public HTTPS domain serving the frontend bucket"
-  value       = aws_cloudfront_distribution.frontend.domain_name
+output "public_cdn_domain" {
+  description = "Public HTTPS domain serving the public bucket"
+  value       = aws_cloudfront_distribution.public.domain_name
 }
 
-output "frontend_cdn_distribution_id" {
+output "public_cdn_distribution_id" {
   description = "Needed for cache invalidations after a deploy"
-  value       = aws_cloudfront_distribution.frontend.id
+  value       = aws_cloudfront_distribution.public.id
 }
 
-output "frontend_developers_group" {
-  description = "IAM group to add frontend team members to"
-  value       = aws_iam_group.frontend_developers.name
+output "web_developers_group" {
+  description = "IAM group to add web team members to"
+  value       = aws_iam_group.web_developers.name
 }

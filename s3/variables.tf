@@ -13,14 +13,14 @@ variable "environment" {
 
 variable "log_retention_days" {
   type        = number
-  default     = 90
+  default     = 30
   description = "Objects under logs/ in the private bucket are deleted after this many days"
 }
 
 variable "backup_retention_days" {
   type        = number
-  default     = 28
-  description = "Objects under backups/ in the private bucket are deleted after this many days (28 = 4 weeks)"
+  default     = 30
+  description = "Objects under backups/ in the private bucket are deleted after this many days"
 }
 
 variable "noncurrent_version_retention_days" {
