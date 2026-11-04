@@ -1,0 +1,31 @@
+#!/bin/bash
+# Terraform renders this template once per instance (templatefile in compute.tf).
+# It writes the node's settings and the scripts from this folder to disk, then
+# runs bootstrap.sh. Output goes to /var/log/pg-bootstrap.log.
+# No passwords here: the scripts read them from Secrets Manager at boot.
+set -euo pipefail
+mkdir -p /etc/pg-bootstrap /opt/pg-bootstrap
+
+cat >/etc/pg-bootstrap/env <<'PG_ENV_EOF'
+NODE_INDEX="${node_index}"
+NODE_NAME="pg-${node_index + 1}"
+CLUSTER_NAME="${cluster_name}"
+AWS_REGION="${aws_region}"
+NODE_IPS="${node_ips}"
+VPC_CIDR="${vpc_cidr}"
+PG_VERSION="${postgres_version}"
+ETCD_VERSION="${etcd_version}"
+DATA_VOLUME_ID="${data_volume_id}"
+SECRET_ARN="${secret_arn}"
+BACKUP_BUCKET="${backup_bucket}"
+BACKUP_RETENTION_FULL="${backup_retention_full}"
+PG_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/pg-bootstrap/${name} <<'PG_SCRIPT_EOF'
+${body}
+PG_SCRIPT_EOF
+chmod 0755 /opt/pg-bootstrap/${name}
+
+%{ endfor ~}
+/opt/pg-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/pg-bootstrap.log
