@@ -63,3 +63,23 @@ output "postgres_secret_arn" {
 output "postgres_backup_bucket" {
   value = module.postgres_cluster.backup_bucket
 }
+
+output "private_bucket_name" {
+  value = module.s3.private_bucket_name
+}
+
+output "frontend_bucket_name" {
+  value = module.s3.frontend_bucket_name
+}
+
+output "frontend_cdn_domain" {
+  value = module.s3.frontend_cdn_domain
+}
+
+output "frontend_cdn_distribution_id" {
+  value = module.s3.frontend_cdn_distribution_id
+}
+
+output "frontend_developers_group" {
+  value = module.s3.frontend_developers_group
+}
