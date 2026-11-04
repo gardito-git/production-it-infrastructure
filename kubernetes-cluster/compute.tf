@@ -75,7 +75,7 @@ resource "aws_instance" "control_plane" {
   instance_type               = "c8i.xlarge"
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ, round-robin
   vpc_security_group_ids      = [aws_security_group.control_plane.id]
-  iam_instance_profile        = var.instance_profile_names["control-plane"]
+  iam_instance_profile        = aws_iam_instance_profile.node["control-plane"].name
   key_name                    = aws_key_pair.nodes.key_name
   associate_public_ip_address = false
 
@@ -123,7 +123,7 @@ resource "aws_instance" "worker" {
   instance_type               = "r8i.xlarge"
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ, round-robin
   vpc_security_group_ids      = [aws_security_group.worker.id]
-  iam_instance_profile        = var.instance_profile_names["worker"]
+  iam_instance_profile        = aws_iam_instance_profile.node["worker"].name
   key_name                    = aws_key_pair.nodes.key_name
   associate_public_ip_address = false
 
@@ -172,7 +172,7 @@ resource "aws_instance" "etcd" {
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ, round-robin
   private_ip                  = local.etcd_ips[count.index]
   vpc_security_group_ids      = [aws_security_group.etcd.id]
-  iam_instance_profile        = var.instance_profile_names["etcd"]
+  iam_instance_profile        = aws_iam_instance_profile.node["etcd"].name
   key_name                    = aws_key_pair.nodes.key_name
   associate_public_ip_address = false
 

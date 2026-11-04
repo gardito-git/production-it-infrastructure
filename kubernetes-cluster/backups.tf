@@ -15,6 +15,6 @@ data "aws_iam_policy_document" "etcd_backups" {
 
 resource "aws_iam_role_policy" "etcd_backups" {
   name   = "etcd-backups"
-  role   = var.node_role_names["etcd"]
+  role   = aws_iam_role.node["etcd"].name
   policy = data.aws_iam_policy_document.etcd_backups.json
 }

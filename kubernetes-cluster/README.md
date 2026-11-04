@@ -48,6 +48,7 @@ boot, so `terraform apply` is the only step.
 | `compute.tf` | Ubuntu AMI lookup, the 12 EC2 instances and their user data |
 | `security-groups.tf` | Security groups and rules for control plane, workers and etcd |
 | `nlb.tf` | Internal NLB, target group and listener for the API server |
+| `iam.tf` | One IAM role + instance profile per node type (control-plane, worker, etcd) |
 | `bootstrap-bucket.tf` | Private S3 bucket the nodes use to share certs and join commands, plus per-role IAM access to it |
 | `backups.tf` | Lets the etcd nodes upload snapshots to `backups/kubernetes/etcd/` in the private bucket |
 | `variables.tf` / `outputs.tf` | Module inputs and outputs |
@@ -69,9 +70,6 @@ module "kubernetes_cluster" {
   private_subnet_ids   = module.vpc.private_subnet_ids
   private_subnet_cidrs = module.vpc.private_subnet_cidrs
 
-  instance_profile_names = module.iam.node_instance_profile_names
-  node_role_names        = module.iam.node_role_names
-
   backup_bucket_name = module.s3.private_bucket_name
   backup_bucket_arn  = module.s3.private_bucket_arn
 
@@ -90,8 +88,6 @@ module "kubernetes_cluster" {
 | `vpc_cidr` | (required) | Allowed to reach the API server, NodePorts and ICMP |
 | `private_subnet_ids` | (required) | Subnets the nodes and the NLB are placed in |
 | `private_subnet_cidrs` | (required) | Same order as `private_subnet_ids`; used for the fixed etcd IPs |
-| `instance_profile_names` | (required) | Map with keys `control-plane`, `worker`, `etcd` |
-| `node_role_names` | (required) | Map with the same keys; each role gets access to the bootstrap bucket |
 | `ssh_public_key` | (required) | Public key installed for user `ubuntu` on every node |
 | `ssh_source_security_group_id` | (required) | Group allowed to SSH in: the VPN endpoint's |
 | `backup_bucket_name`, `backup_bucket_arn` | (required) | The private bucket from the `s3` module |

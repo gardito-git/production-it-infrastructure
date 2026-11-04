@@ -116,6 +116,6 @@ resource "aws_iam_role_policy" "bootstrap_access" {
   for_each = local.bootstrap_access
 
   name   = "k8s-bootstrap-bucket"
-  role   = var.node_role_names[each.key]
+  role   = aws_iam_role.node[each.key].name
   policy = data.aws_iam_policy_document.bootstrap_access[each.key].json
 }

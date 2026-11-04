@@ -31,15 +31,6 @@ variable "private_subnet_cidrs" {
   description = "CIDRs of private_subnet_ids, same order. Used to give etcd nodes fixed IPs."
 }
 
-variable "instance_profile_names" {
-  type        = map(string)
-  description = "Instance profile per node type: control-plane, worker, etcd (module.iam.node_instance_profile_names)"
-}
-
-variable "node_role_names" {
-  type        = map(string)
-  description = "IAM role per node type, given access to the bootstrap bucket (module.iam.node_role_names)"
-}
 
 variable "backup_bucket_name" {
   type        = string

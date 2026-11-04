@@ -1,3 +1,7 @@
+# IAM roles and instance profiles for the cluster nodes: one per node type.
+# Their extra permissions are attached where they're used: bootstrap-bucket.tf
+# (bootstrap secrets) and backups.tf (etcd snapshots).
+
 # "aws" in commercial regions, "aws-cn" / "aws-us-gov" elsewhere. Using it keeps
 # the policy ARNs below valid in every partition.
 data "aws_partition" "current" {}
@@ -8,6 +12,7 @@ locals {
   node_roles = toset(["control-plane", "worker", "etcd"])
 
   # Shell access is SSH over the VPN (vpc/vpn.tf), so no SSM policy here.
+  managed_policies = {
     # Lets containerd pull images from ECR.
     ecr_read = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   }
