@@ -18,6 +18,24 @@ module "s3" {
   environment  = var.environment
 }
 
+module "web_server" {
+  source = "./web-server"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = module.vpc.vpc_cidr
+  public_subnet_ids  = module.vpc.public_subnet_ids  # the load balancer
+  private_subnet_ids = module.vpc.private_subnet_ids # the servers
+
+  ssh_public_key               = var.ssh_public_key
+  ssh_source_security_group_id = module.vpc.vpn_security_group_id
+
+  # Set to an ACM certificate ARN to enable HTTPS (port 80 then redirects to 443).
+  certificate_arn = null
+}
+
 module "kubernetes_cluster" {
   source = "./kubernetes-cluster"
 

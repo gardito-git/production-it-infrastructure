@@ -87,3 +87,12 @@ output "web_developers_group" {
 output "kubernetes_etcd_backup_location" {
   value = "s3://${module.s3.private_bucket_name}/backups/kubernetes/etcd/"
 }
+
+output "web_alb_dns_name" {
+  description = "Public address of the web load balancer: point your domain at it"
+  value       = module.web_server.alb_dns_name
+}
+
+output "web_server_private_ips" {
+  value = module.web_server.private_ips
+}
