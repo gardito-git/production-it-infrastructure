@@ -152,4 +152,3 @@ all covered in [scripts/README.md](scripts/README.md).
 - [ ] Monitoring and logging (e.g. kube-prometheus-stack + a log shipper)
 - [ ] Upgrade runbook (`kubeadm upgrade`, one minor version at a time)
 - [ ] Node replacement runbook (new join tokens, etcd member replacement)
-- [ ] Remote Terraform state (S3 backend with locking)
