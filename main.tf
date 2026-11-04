@@ -11,13 +11,6 @@ module "vpc" {
   vpn_client_names = var.vpn_client_names
 }
 
-module "iam" {
-  source = "./iam"
-
-  project_name = var.project_name
-  environment  = var.environment
-}
-
 module "s3" {
   source = "./s3"
 
