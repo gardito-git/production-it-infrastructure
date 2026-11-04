@@ -11,6 +11,11 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    # Generates the PostgreSQL passwords (postgres-cluster/secret-manager.tf).
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 

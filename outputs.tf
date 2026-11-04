@@ -46,3 +46,20 @@ output "worker_private_ips" {
 output "etcd_private_ips" {
   value = module.kubernetes_cluster.etcd_private_ips
 }
+
+output "postgres_endpoint" {
+  description = "Port 5432 = primary (read-write), 5433 = replicas (read-only)"
+  value       = module.postgres_cluster.endpoint
+}
+
+output "postgres_node_private_ips" {
+  value = module.postgres_cluster.node_private_ips
+}
+
+output "postgres_secret_arn" {
+  value = module.postgres_cluster.secret_arn
+}
+
+output "postgres_backup_bucket" {
+  value = module.postgres_cluster.backup_bucket
+}
