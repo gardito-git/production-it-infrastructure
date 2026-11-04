@@ -25,7 +25,7 @@ output "secret_arn" {
   value       = aws_secretsmanager_secret.postgres.arn
 }
 
-output "backup_bucket" {
-  description = "S3 bucket holding the pgBackRest backups and WAL archive"
-  value       = aws_s3_bucket.backups.id
+output "backup_location" {
+  description = "Where the pgBackRest backups and WAL archive are stored"
+  value       = "s3://${var.backup_bucket_name}/${var.backup_prefix}/"
 }

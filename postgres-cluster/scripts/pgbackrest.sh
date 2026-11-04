@@ -13,7 +13,8 @@ repo1-s3-region=$AWS_REGION
 repo1-s3-endpoint=s3.$AWS_REGION.amazonaws.com
 # Credentials come from the instance's IAM role.
 repo1-s3-key-type=auto
-repo1-path=/pgbackrest
+# The repository's "folder" in the shared private bucket, e.g. /backups/postgres
+repo1-path=$BACKUP_PATH
 # Keep this many full backups (one per week), plus the WAL to restore to any point in between.
 repo1-retention-full=$BACKUP_RETENTION_FULL
 compress-type=zst

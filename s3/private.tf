@@ -1,12 +1,10 @@
 # General-purpose private bucket: logs, backups, uploads, anything that must
 # never be public. Organise it with key prefixes ("folders"):
-#   logs/      deleted after var.log_retention_days
-#   backups/   deleted after var.backup_retention_days, e.g. backups/kubernetes/etcd/
-#   tmp/       deleted after 7 days
+#   logs/                deleted after var.log_retention_days
+#   backups/kubernetes/  etcd snapshots, deleted after var.backup_retention_days
+#   backups/postgres/    pgBackRest repository; pgBackRest deletes old backups itself
+#   tmp/                 deleted after 7 days
 #   anything else (uploads/, web/, ...) is kept until someone deletes it.
-#
-# S3 has no real folders: a prefix appears as soon as an object is written under it,
-# so there is nothing to create here in advance.
 
 data "aws_caller_identity" "current" {}
 
@@ -70,12 +68,26 @@ resource "aws_s3_bucket_versioning" "private" {
   }
 }
 
+# S3 has no real folders; a prefix appears once something is written under it.
+# These empty "folder" objects (what the S3 console's "Create folder" makes) only
+# make the backup layout visible before the first backup runs.
+resource "aws_s3_object" "backup_folders" {
+  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/"])
+
+  bucket  = aws_s3_bucket.private.id
+  key     = each.value
+  content = ""
+}
+
 locals {
-  # prefix => days until objects under it are deleted
+  # prefix => days until objects under it are deleted.
+  # backups/postgres/ is deliberately NOT here: pgBackRest decides which files
+  # are still needed (an old full backup, the WAL newer backups depend on).
+  # Deleting them by age would leave backups that can't be restored.
   private_expiring_prefixes = {
-    "logs/"    = var.log_retention_days
-    "backups/" = var.backup_retention_days
-    "tmp/"     = 7
+    "logs/"               = var.log_retention_days
+    "backups/kubernetes/" = var.backup_retention_days
+    "tmp/"                = 7
   }
 }
 
@@ -86,11 +98,15 @@ resource "aws_s3_bucket_lifecycle_configuration" "private" {
     for_each = local.private_expiring_prefixes
 
     content {
-      id     = "expire-${trimsuffix(rule.key, "/")}"
+      id     = "expire-${replace(trimsuffix(rule.key, "/"), "/", "-")}"
       status = "Enabled"
 
+      # Only objects bigger than 0 bytes, so the empty folder objects above stay.
       filter {
-        prefix = rule.key
+        and {
+          prefix                   = rule.key
+          object_size_greater_than = 0
+        }
       }
 
       expiration {

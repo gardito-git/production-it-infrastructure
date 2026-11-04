@@ -60,8 +60,8 @@ output "postgres_secret_arn" {
   value = module.postgres_cluster.secret_arn
 }
 
-output "postgres_backup_bucket" {
-  value = module.postgres_cluster.backup_bucket
+output "postgres_backup_location" {
+  value = module.postgres_cluster.backup_location
 }
 
 output "private_bucket_name" {
@@ -82,4 +82,8 @@ output "public_cdn_distribution_id" {
 
 output "web_developers_group" {
   value = module.s3.web_developers_group
+}
+
+output "kubernetes_etcd_backup_location" {
+  value = "s3://${module.s3.private_bucket_name}/backups/kubernetes/etcd/"
 }

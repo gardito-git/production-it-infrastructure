@@ -49,6 +49,7 @@ boot, so `terraform apply` is the only step.
 | `security-groups.tf` | Security groups and rules for control plane, workers and etcd |
 | `nlb.tf` | Internal NLB, target group and listener for the API server |
 | `bootstrap-bucket.tf` | Private S3 bucket the nodes use to share certs and join commands, plus per-role IAM access to it |
+| `backups.tf` | Lets the etcd nodes upload snapshots to `backups/kubernetes/etcd/` in the private bucket |
 | `variables.tf` / `outputs.tf` | Module inputs and outputs |
 | `scripts/` | Bootstrap scripts that run on the nodes. See [scripts/README.md](scripts/README.md) |
 
@@ -71,6 +72,9 @@ module "kubernetes_cluster" {
   instance_profile_names = module.iam.node_instance_profile_names
   node_role_names        = module.iam.node_role_names
 
+  backup_bucket_name = module.s3.private_bucket_name
+  backup_bucket_arn  = module.s3.private_bucket_arn
+
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id
 }
@@ -90,6 +94,9 @@ module "kubernetes_cluster" {
 | `node_role_names` | (required) | Map with the same keys; each role gets access to the bootstrap bucket |
 | `ssh_public_key` | (required) | Public key installed for user `ubuntu` on every node |
 | `ssh_source_security_group_id` | (required) | Group allowed to SSH in: the VPN endpoint's |
+| `backup_bucket_name`, `backup_bucket_arn` | (required) | The private bucket from the `s3` module |
+| `backup_prefix` | `"backups/kubernetes"` | etcd snapshots go to `<prefix>/etcd/` |
+| `etcd_backup_schedule` | `"*-*-* 00/6:00:00"` | systemd `OnCalendar`: every 6 hours, UTC |
 | `kubernetes_version` | `"1.37"` | Kubernetes minor version |
 | `cilium_version` | `"1.20.4"` | Cilium version |
 | `cilium_cli_version` | `"0.20.2"` | cilium-cli version used to install Cilium |
@@ -142,7 +149,8 @@ all covered in [scripts/README.md](scripts/README.md).
 
 ## TO-DO
 
-- [ ] etcd backups: scheduled `etcdctl snapshot save` to a versioned S3 bucket
+- [x] etcd backups: every 6 hours to `backups/kubernetes/etcd/` in the private bucket (see [scripts/README.md](scripts/README.md#etcd-backups))
+- [ ] Certificate backups (`/etc/kubernetes/pki`), needed together with etcd for a full restore
 - [ ] AWS cloud controller manager, for `type: LoadBalancer` Services
 - [ ] AWS EBS CSI driver, for PersistentVolumes
 - [ ] Monitoring and logging (e.g. kube-prometheus-stack + a log shipper)

@@ -21,3 +21,30 @@ kubeadm init phase etcd local --config=/etc/kubernetes/etcd-kubeadmcfg.yaml
 # etcd only reports healthy once a quorum (2 of 3) of members is up.
 wait_tcp "$MY_IP" 2379
 log "etcd is listening on $MY_IP:2379"
+
+log "Scheduling etcd snapshots to s3://$BACKUP_BUCKET/$BACKUP_PREFIX/etcd/ ($ETCD_BACKUP_SCHEDULE)"
+cat >/etc/systemd/system/etcd-backup.service <<EOF
+[Unit]
+Description=Snapshot etcd and upload it to S3
+
+[Service]
+Type=oneshot
+ExecStart=$SCRIPT_DIR/etcd-backup.sh
+EOF
+
+cat >/etc/systemd/system/etcd-backup.timer <<EOF
+[Unit]
+Description=Scheduled etcd snapshots
+
+[Timer]
+OnCalendar=$ETCD_BACKUP_SCHEDULE
+# Spread the 3 members' uploads a little, and catch up after downtime.
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now etcd-backup.timer

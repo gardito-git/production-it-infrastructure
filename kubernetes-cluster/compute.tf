@@ -48,6 +48,9 @@ locals {
     service_cidr           = var.service_cidr
     cilium_version         = var.cilium_version
     cilium_cli_version     = var.cilium_cli_version
+    backup_bucket          = var.backup_bucket_name
+    backup_prefix          = var.backup_prefix
+    etcd_backup_schedule   = var.etcd_backup_schedule
     scripts                = local.bootstrap_scripts
   }
 }
@@ -63,7 +66,7 @@ resource "aws_key_pair" "nodes" {
 #   etcd-1 creates certs -> etcd-2/3 start -> control-plane-1 runs kubeadm init
 #   -> control-plane-2/3 and the workers join.
 # They wait for each other through the S3 bucket, so Terraform can start them all at once.
-# user_data is gzipped: uncompressed it's ~16 KB, right at EC2's 16 KB limit (cloud-init unzips it).
+# user_data is gzipped: uncompressed it's ~18 KB, over EC2's 16 KB limit (cloud-init unzips it).
 
 resource "aws_instance" "control_plane" {
   count = 3

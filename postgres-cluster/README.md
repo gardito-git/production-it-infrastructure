@@ -26,7 +26,7 @@ themselves at first boot, so `terraform apply` is the only step.
 | **Patroni 4.1** | Runs PostgreSQL on each node, elects one primary, turns the others into streaming replicas, and promotes a replica if the primary fails |
 | **etcd 3.6** (on the same 3 nodes) | Holds Patroni's leader lock. A majority (2 of 3) must agree, so two nodes can never both be primary |
 | **Internal NLB** | One stable hostname. Port 5432 always reaches the primary, port 5433 the replicas; it follows failovers automatically |
-| **pgBackRest → S3** | Weekly full and daily differential backups, plus every WAL file: restore to any point in time within ~4 weeks |
+| **pgBackRest → S3** | Weekly full and daily differential backups, plus every WAL file, in the private bucket under `backups/postgres/`: restore to any point in time within ~4 weeks |
 | **Secrets Manager** | Superuser, replication and Patroni API passwords. Nodes read them at boot; nothing secret is in user data |
 | **watchdog (softdog)** | Reboots a primary that freezes, so it can't keep taking writes after another node was promoted |
 
@@ -97,8 +97,7 @@ Change PostgreSQL settings with `patronictl edit-config`, **not** by editing
 | `security-groups.tf` | Security group and rules (5432, 8008, etcd, SSH from VPN, ICMP) |
 | `nlb.tf` | Internal NLB with the primary (5432) and replica (5433) target groups |
 | `secret-manager.tf` | Generated passwords and the Secrets Manager secret |
-| `backups.tf` | S3 bucket for pgBackRest |
-| `iam.tf` | Node role: read its secret, read/write the backup bucket |
+| `iam.tf` | Node role: read its secret, read/write `backups/postgres/` in the private bucket |
 | `scripts/` | First-boot scripts: `node-prep.sh` (OS, volume, packages), `etcd.sh`, `patroni.sh`, `pgbackrest.sh`, and `pg-backup.sh` (run by the backup timers) |
 
 ## Inputs
@@ -115,12 +114,14 @@ Change PostgreSQL settings with `patronictl edit-config`, **not** by editing
 | `data_volume_iops` / `data_volume_throughput` | `3000` / `250` | gp3 performance per volume |
 | `postgres_version` | `"18"` | Major version for new nodes (does not upgrade a running cluster) |
 | `etcd_version` | `"3.6.16"` | etcd release |
+| `backup_bucket_name`, `backup_bucket_arn` | (required) | The private bucket from the `s3` module |
+| `backup_prefix` | `"backups/postgres"` | Where in that bucket pgBackRest keeps its repository |
 | `backup_retention_full` | `4` | Weekly full backups kept |
 
 ## Outputs
 
 `endpoint`, `read_write_port` (5432), `read_only_port` (5433), `node_private_ips`,
-`secret_arn`, `backup_bucket`.
+`secret_arn`, `backup_location` (`s3://<private-bucket>/backups/postgres/`).
 
 ## Things to know
 
@@ -131,8 +132,10 @@ Change PostgreSQL settings with `patronictl edit-config`, **not** by editing
   with `read-only transaction` errors, so nothing gets corrupted; clients just retry.
 - **Don't connect to the NLB from the database nodes themselves.** The NLB preserves
   client IPs, so a node routed back to itself drops the connection. Use `localhost` there.
-- **`terraform destroy` stops at the backup bucket** while it holds backups (`force_destroy = false`
-  on purpose). Empty it by hand if you really want everything gone.
+- **Backups live in the shared private bucket** (`s3` module), under `backups/postgres/`.
+  Only pgBackRest deletes files there; the bucket's age-based lifecycle rules deliberately
+  skip this prefix, because deleting backup or WAL files by age breaks restores.
+  The nodes' IAM role can only touch this prefix.
 - **Data volumes are separate from instances.** If an instance is replaced, its volume is
   re-attached. Destroying the volumes deletes the data on that node.
 - **Changing `postgres_version` doesn't upgrade anything.** Major upgrades need

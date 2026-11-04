@@ -39,6 +39,10 @@ module "kubernetes_cluster" {
   instance_profile_names = module.iam.node_instance_profile_names
   node_role_names        = module.iam.node_role_names
 
+  # etcd snapshots -> s3://<private bucket>/backups/kubernetes/etcd/
+  backup_bucket_name = module.s3.private_bucket_name
+  backup_bucket_arn  = module.s3.private_bucket_arn
+
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id
 }
@@ -53,6 +57,10 @@ module "postgres_cluster" {
   vpc_cidr             = module.vpc.vpc_cidr
   private_subnet_ids   = module.vpc.private_subnet_ids
   private_subnet_cidrs = module.vpc.private_subnet_cidrs
+
+  # pgBackRest -> s3://<private bucket>/backups/postgres/
+  backup_bucket_name = module.s3.private_bucket_name
+  backup_bucket_arn  = module.s3.private_bucket_arn
 
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id

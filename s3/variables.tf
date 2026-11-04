@@ -20,7 +20,7 @@ variable "log_retention_days" {
 variable "backup_retention_days" {
   type        = number
   default     = 30
-  description = "Objects under backups/ in the private bucket are deleted after this many days"
+  description = "Kubernetes etcd snapshots (backups/kubernetes/) are deleted after this many days. PostgreSQL retention is set in postgres-cluster (backup_retention_full)."
 }
 
 variable "noncurrent_version_retention_days" {

@@ -39,7 +39,8 @@ Expect about 10–15 minutes from `terraform apply` to all nodes `Ready`.
 | `lib.sh` | (sourced) | Logging, IMDSv2, S3 upload/wait helpers |
 | `node-prep.sh` | every node | Swap off, kernel modules, sysctls, containerd, kubelet/kubeadm/kubectl, AWS CLI |
 | `etcd-certs.sh` | etcd-1 | etcd CA and per-member certificates |
-| `etcd-start.sh` | etcd-1..3 | Installs this member's certs and starts etcd |
+| `etcd-start.sh` | etcd-1..3 | Installs this member's certs, starts etcd, schedules backups |
+| `etcd-backup.sh` | etcd-1..3 | Run by `etcd-backup.timer`: snapshot etcd, upload to S3 |
 | `control-plane-init.sh` | control-plane-1 | `kubeadm init`, publishes join commands, installs Cilium |
 | `control-plane-join.sh` | control-plane-2, -3 | `kubeadm join --control-plane` |
 | `worker-join.sh` | worker-1..6 | `kubeadm join` |
@@ -101,11 +102,39 @@ aws s3 rm "s3://$(terraform output -raw kubernetes_bootstrap_bucket)" --recursiv
   only affect new instances. That's deliberate: Terraform must never replace a cluster node
   just because a script changed.
 
+## etcd backups
+
+`etcd-start.sh` installs a systemd timer (`etcd-backup.timer`) on every etcd node.
+Every 6 hours (`etcd_backup_schedule`), `etcd-backup.sh` takes a snapshot with
+`etcdctl snapshot save` and uploads it to the private bucket:
+
+```
+s3://<private-bucket>/backups/kubernetes/etcd/etcd-1/etcd-1-20261105T060000Z.db.gz
+                                             /etcd-2/...
+                                             /etcd-3/...
+```
+
+Each member uploads its own copy, so backups continue while any member is alive.
+The bucket deletes snapshots after 30 days (`backup_retention_days` in the `s3` module).
+The etcd nodes can upload but not read or delete there.
+
+```bash
+sudo systemctl list-timers etcd-backup.timer      # next run
+sudo systemctl start etcd-backup.service          # back up now
+journalctl -u etcd-backup.service                 # last runs
+```
+
+To restore, follow the Kubernetes guide
+["Restoring an etcd cluster"](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster):
+stop the API servers, run `etcdutl snapshot restore` on each member, then start everything again.
+Practise it once before you need it.
+
 ## Production checklist: what this doesn't do yet
 
-1. **etcd backups.** The most important one. Add a cron or systemd timer on etcd-1
-   that runs `etcdctl snapshot save` and uploads to a versioned S3 bucket. Without backups,
-   losing 2 of 3 etcd nodes means losing the cluster.
+1. **Back up the certificates too.** etcd snapshots are done (see below), but restoring a
+   cluster also needs `/etc/kubernetes/pki` from a control-plane node (cluster CA,
+   service-account keys) and etcd-1's etcd CA. Without them you must re-issue every
+   certificate and re-join every node.
 2. **AWS cloud controller manager + EBS CSI driver**, for `type: LoadBalancer` Services and
    PersistentVolumes on EBS. The `kubernetes.io/cluster/<name>` tags are already in place.
 3. **Monitoring and logging**, e.g. kube-prometheus-stack plus a log shipper.

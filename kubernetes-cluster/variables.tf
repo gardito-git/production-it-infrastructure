@@ -41,6 +41,28 @@ variable "node_role_names" {
   description = "IAM role per node type, given access to the bootstrap bucket (module.iam.node_role_names)"
 }
 
+variable "backup_bucket_name" {
+  type        = string
+  description = "Private bucket the etcd snapshots are uploaded to (module.s3.private_bucket_name)"
+}
+
+variable "backup_bucket_arn" {
+  type        = string
+  description = "ARN of backup_bucket_name, for the etcd nodes' IAM policy (module.s3.private_bucket_arn)"
+}
+
+variable "backup_prefix" {
+  type        = string
+  default     = "backups/kubernetes"
+  description = "Key prefix (\"folder\") for Kubernetes backups, without leading or trailing slash. Snapshots go to <prefix>/etcd/."
+}
+
+variable "etcd_backup_schedule" {
+  type        = string
+  default     = "*-*-* 00/6:00:00"
+  description = "When each etcd member uploads a snapshot, as a systemd OnCalendar expression (default: every 6 hours, UTC)"
+}
+
 variable "ssh_public_key" {
   type        = string
   description = "SSH public key installed on every node for user \"ubuntu\""

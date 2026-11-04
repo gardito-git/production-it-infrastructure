@@ -18,6 +18,9 @@ POD_CIDR="${pod_cidr}"
 SERVICE_CIDR="${service_cidr}"
 CILIUM_VERSION="${cilium_version}"
 CILIUM_CLI_VERSION="${cilium_cli_version}"
+BACKUP_BUCKET="${backup_bucket}"
+BACKUP_PREFIX="${backup_prefix}"
+ETCD_BACKUP_SCHEDULE="${etcd_backup_schedule}"
 K8S_ENV_EOF
 
 %{ for name, body in scripts ~}

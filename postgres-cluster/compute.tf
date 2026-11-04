@@ -45,7 +45,8 @@ locals {
     postgres_version      = var.postgres_version
     etcd_version          = var.etcd_version
     secret_arn            = aws_secretsmanager_secret.postgres.arn
-    backup_bucket         = aws_s3_bucket.backups.id
+    backup_bucket         = var.backup_bucket_name
+    backup_path           = "/${var.backup_prefix}"
     backup_retention_full = var.backup_retention_full
     scripts               = local.bootstrap_scripts
   }

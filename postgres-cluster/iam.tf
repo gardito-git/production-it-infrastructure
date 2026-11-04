@@ -1,5 +1,5 @@
 # The nodes' IAM role lives in this module (not ../iam) because every permission
-# it has is about this module's own bucket and secret.
+# it has is about this module's own secret and backup prefix.
 
 data "aws_iam_policy_document" "ec2_assume" {
   statement {
@@ -29,17 +29,24 @@ data "aws_iam_policy_document" "postgres" {
     resources = [aws_secretsmanager_secret.postgres.arn]
   }
 
-  # pgBackRest lists, reads, writes and (for retention) deletes backup files.
+  # pgBackRest lists, reads, writes and (for retention) deletes backup files,
+  # only under its own prefix of the shared private bucket.
   statement {
-    sid       = "BackupBucketList"
+    sid       = "BackupPrefixList"
     actions   = ["s3:ListBucket"]
-    resources = [aws_s3_bucket.backups.arn]
+    resources = [var.backup_bucket_arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = [var.backup_prefix, "${var.backup_prefix}/*"]
+    }
   }
 
   statement {
-    sid       = "BackupObjects"
+    sid       = "BackupPrefixObjects"
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = ["${aws_s3_bucket.backups.arn}/*"]
+    resources = ["${var.backup_bucket_arn}/${var.backup_prefix}/*"]
   }
 }
 

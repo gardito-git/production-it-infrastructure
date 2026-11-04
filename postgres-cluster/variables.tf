@@ -82,6 +82,22 @@ variable "etcd_version" {
   description = "etcd release used by Patroni to elect the primary"
 }
 
+variable "backup_bucket_name" {
+  type        = string
+  description = "Private bucket pgBackRest writes to (module.s3.private_bucket_name)"
+}
+
+variable "backup_bucket_arn" {
+  type        = string
+  description = "ARN of backup_bucket_name, for the nodes' IAM policy (module.s3.private_bucket_arn)"
+}
+
+variable "backup_prefix" {
+  type        = string
+  default     = "backups/postgres"
+  description = "Key prefix (\"folder\") for the pgBackRest repository, without leading or trailing slash"
+}
+
 variable "backup_retention_full" {
   type        = number
   default     = 4

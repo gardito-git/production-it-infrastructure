@@ -12,13 +12,16 @@ avoid clashing with somebody else's bucket.
 
 ## Private bucket
 
-Organise it with key prefixes. S3 has no real folders: `backups/kubernetes/etcd/`
-exists as soon as you upload a file to it, so nothing needs creating in advance.
+Organise it with key prefixes. S3 has no real folders: a prefix exists as soon as a
+file is uploaded under it. `backups/`, `backups/kubernetes/` and `backups/postgres/` are
+created as empty "folder" objects (like the S3 console's "Create folder") so the layout
+is visible before the first backup.
 
-| Prefix | Kept for | Example |
+| Prefix | Kept for | Written by |
 |---|---|---|
-| `logs/` | 30 days (`log_retention_days`) | `logs/nginx/2026-11-05.gz` |
-| `backups/` | 30 days (`backup_retention_days`) | `backups/kubernetes/etcd/snapshot-2026-11-05.db` |
+| `logs/` | 30 days (`log_retention_days`) | e.g. `logs/nginx/2026-11-05.gz` |
+| `backups/kubernetes/` | 30 days (`backup_retention_days`) | etcd nodes, every 6 h: `backups/kubernetes/etcd/etcd-1/etcd-1-<time>.db.gz` |
+| `backups/postgres/` | **Managed by pgBackRest** (4 weekly fulls + WAL) | PostgreSQL primary |
 | `tmp/` | 7 days | Scratch files |
 | `web/` | Until deleted | The web team's own files and backups |
 | anything else | Until deleted | `uploads/`, ... |
@@ -27,10 +30,13 @@ exists as soon as you upload a file to it, so nothing needs creating in advance.
   (`noncurrent_version_retention_days`). So `logs/` really disappears after 30 + 30 days.
 - **Use `/` in keys, not `\`.** `backups/kubernetes/`, never `Production\Kubernetes`.
   Use one bucket per environment instead of an environment folder.
-- **PostgreSQL backups are not here.** pgBackRest has its own bucket
-  (`postgres-cluster/backups.tf`), keeps them for 4 weeks itself, and only the database
-  nodes can write to it. Keeping critical backups in a separate bucket limits who and
-  what can delete them.
+- **Never add an age-based lifecycle rule for `backups/postgres/`.** pgBackRest decides which
+  files are still needed: an old full backup that newer differentials build on, and the WAL
+  between them. Deleting them by age leaves backups that can't be restored. Retention is
+  `backup_retention_full` in `postgres-cluster` instead.
+- **Each writer can only reach its own prefix.** The etcd nodes can only upload to
+  `backups/kubernetes/etcd/` (no read or delete). The PostgreSQL nodes can only use
+  `backups/postgres/`. Versioning keeps deleted files for 30 days in case something goes wrong.
 
 ## Public bucket + CloudFront
 
