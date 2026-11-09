@@ -1,0 +1,30 @@
+#!/bin/bash
+# Terraform renders this template once per instance (templatefile in compute.tf).
+# It writes the node's settings and the scripts from this folder to disk, then
+# runs bootstrap.sh. Output goes to /var/log/redis-bootstrap.log.
+# No passwords here: the scripts read them from Secrets Manager at boot.
+set -euo pipefail
+mkdir -p /etc/redis-bootstrap /opt/redis-bootstrap
+
+cat >/etc/redis-bootstrap/env <<'REDIS_ENV_EOF'
+NODE_INDEX="${node_index}"
+NODE_NAME="redis-${node_index + 1}"
+AWS_REGION="${aws_region}"
+NODE_IPS="${node_ips}"
+REDIS_VERSION="${redis_version}"
+SENTINEL_MASTER_NAME="${sentinel_master_name}"
+MAXMEMORY_POLICY="${maxmemory_policy}"
+DATA_VOLUME_ID="${data_volume_id}"
+SECRET_ARN="${secret_arn}"
+BACKUP_BUCKET="${backup_bucket}"
+BACKUP_PREFIX="${backup_prefix}"
+REDIS_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/redis-bootstrap/${name} <<'REDIS_SCRIPT_EOF'
+${body}
+REDIS_SCRIPT_EOF
+chmod 0755 /opt/redis-bootstrap/${name}
+
+%{ endfor ~}
+/opt/redis-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/redis-bootstrap.log

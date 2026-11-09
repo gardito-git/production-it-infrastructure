@@ -96,3 +96,24 @@ output "web_alb_dns_name" {
 output "web_server_private_ips" {
   value = module.web_server.private_ips
 }
+
+output "redis_sentinel_endpoints" {
+  description = "Sentinel addresses for Sentinel-aware Redis clients (master name: redis_sentinel_master_name)"
+  value       = module.redis_sentinel.sentinel_endpoints
+}
+
+output "redis_sentinel_master_name" {
+  value = module.redis_sentinel.sentinel_master_name
+}
+
+output "redis_node_private_ips" {
+  value = module.redis_sentinel.node_private_ips
+}
+
+output "redis_secret_arn" {
+  value = module.redis_sentinel.secret_arn
+}
+
+output "redis_backup_location" {
+  value = module.redis_sentinel.backup_location
+}
