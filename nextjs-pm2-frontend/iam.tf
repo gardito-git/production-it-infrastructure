@@ -46,7 +46,7 @@ resource "aws_iam_instance_profile" "frontend" {
   role = aws_iam_role.frontend.name
 }
 
-# Deployers (people or CI)
+# Deployers (the web_developers group)
 
 data "aws_iam_policy_document" "deployer" {
   statement {

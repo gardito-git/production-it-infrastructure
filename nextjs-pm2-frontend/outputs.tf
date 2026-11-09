@@ -32,8 +32,3 @@ output "private_ips" {
 output "instance_ids" {
   value = aws_instance.frontend[*].id
 }
-
-output "github_release_role_arn" {
-  description = "Set as the AWS_ROLE_ARN variable in your Next.js GitHub repository"
-  value       = local.github_enabled ? aws_iam_role.github_release[0].arn : null
-}

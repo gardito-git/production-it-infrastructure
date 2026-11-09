@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds the Next.js app ONCE and uploads it, so every server runs the exact
-# same build. Run it from your Next.js project folder, on Linux x64 (CI, WSL or
-# a Linux machine), with the same Node.js major version as the servers:
+# same build. Run it from your Next.js project folder, on Linux x64 (WSL or a
+# Linux machine), with the same Node.js major version as the servers:
 #
 #   /path/to/release.sh <version> <bucket>
 #   /path/to/release.sh v1.4.2 "$(terraform output -raw frontend_bucket_name)"

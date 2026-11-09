@@ -132,20 +132,3 @@ variable "cloudfront_price_class" {
   default     = "PriceClass_200"
   description = "CloudFront edge locations. PriceClass_200 includes Asia; PriceClass_100 is cheaper but only North America and Europe."
 }
-
-variable "github_repository" {
-  type        = string
-  default     = null
-  description = "Your Next.js repository as \"owner/name\". Its v* tags may release through GitHub Actions (github-actions.tf). null = no CI role."
-
-  validation {
-    condition     = var.github_repository == null || can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
-    error_message = "github_repository must look like \"my-org/my-next-app\"."
-  }
-}
-
-variable "github_oidc_provider_arn" {
-  type        = string
-  default     = null
-  description = "ARN of an existing GitHub OIDC provider in this account (only one may exist). null = create it."
-}
