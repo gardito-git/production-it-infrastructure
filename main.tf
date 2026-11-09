@@ -110,3 +110,28 @@ module "elasticsearch_cluster" {
   ssh_public_key        = var.ssh_public_key
   vpn_security_group_id = module.vpc.vpn_security_group_id # SSH and Kibana
 }
+
+module "nextjs_frontend" {
+  source = "./nextjs-pm2-frontend"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = module.vpc.vpc_cidr
+  private_subnet_ids = module.vpc.private_subnet_ids # internal ALB and servers
+
+  ssh_public_key               = var.ssh_public_key
+  ssh_source_security_group_id = module.vpc.vpn_security_group_id
+
+  # The web team may upload releases and static files.
+  deployer_group_name = module.s3.web_developers_group
+
+  # Your Next.js repo ("owner/name"): its v* tags release through GitHub Actions
+  # (nextjs-pm2-frontend/github/release.yml). null = no CI role.
+  # github_repository = null
+
+  # Your own domain: ACM certificate in us-east-1 (see nextjs-pm2-frontend/README.md).
+  domain_names        = []
+  acm_certificate_arn = null
+}

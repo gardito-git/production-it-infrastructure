@@ -134,3 +134,31 @@ output "elasticsearch_secret_arn" {
 output "elasticsearch_snapshot_location" {
   value = module.elasticsearch_cluster.snapshot_location
 }
+
+output "frontend_url" {
+  value = module.nextjs_frontend.url
+}
+
+output "frontend_cloudfront_domain" {
+  description = "Point your domain at this"
+  value       = module.nextjs_frontend.cloudfront_domain
+}
+
+output "frontend_distribution_id" {
+  value = module.nextjs_frontend.distribution_id
+}
+
+output "frontend_bucket_name" {
+  description = "Pass to nextjs-pm2-frontend/scripts/release.sh"
+  value       = module.nextjs_frontend.bucket_name
+}
+
+output "frontend_private_ips" {
+  description = "SSH over the VPN, then: sudo deploy-frontend <version>"
+  value       = module.nextjs_frontend.private_ips
+}
+
+output "frontend_github_release_role_arn" {
+  description = "AWS_ROLE_ARN variable for the Next.js repository's release workflow"
+  value       = module.nextjs_frontend.github_release_role_arn
+}
