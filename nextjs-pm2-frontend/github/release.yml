@@ -1,0 +1,63 @@
+# GitHub Actions workflow for your NEXT.JS repository (not this infrastructure repo).
+# Copy it to .github/workflows/release.yml there, and copy
+# nextjs-pm2-frontend/scripts/release.sh to scripts/release.sh (chmod +x).
+#
+# On every v* tag (git tag v1.4.2 && git push origin v1.4.2) it builds once and
+# uploads the release. Deploying stays one deliberate command over the VPN:
+#   ansible-playbook deploy.yml -e version=v1.4.2
+#
+# Repository settings -> Secrets and variables -> Actions -> Variables:
+#   AWS_ROLE_ARN       terraform output -raw frontend_github_release_role_arn
+#   AWS_REGION         the region in terraform.tfvars, e.g. ap-southeast-1
+#   FRONTEND_BUCKET    terraform output -raw frontend_bucket_name
+#   NEXT_PUBLIC_...    any build-time variables your app needs (add them under env: below)
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Never two releases at once; a release that started is never cancelled halfway.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # ask GitHub for the OIDC token that AWS trusts
+  contents: read
+
+jobs:
+  release:
+    # Linux x86_64: the same platform as the servers, so native modules
+    # (sharp for next/image) are built for them.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24 # must match node_major in Terraform
+          cache: npm
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Build and upload
+        run: ./scripts/release.sh "$GITHUB_REF_NAME" "${{ vars.FRONTEND_BUCKET }}"
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          # NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+
+      - name: Next step
+        run: |
+          {
+            echo "### Released \`$GITHUB_REF_NAME\`"
+            echo "Deploy it (connected to the VPN, in nextjs-pm2-frontend/ansible):"
+            echo '```'
+            echo "ansible-playbook deploy.yml -e version=$GITHUB_REF_NAME"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
