@@ -26,7 +26,7 @@ resource "aws_instance" "frontend" {
   count = var.instance_count
 
   ami                         = data.aws_ami.ubuntu_2404.id
-  instance_type               = var.instance_type
+  instance_type               = "r8i.xlarge" # 4 vCPU, 32 GiB RAM: 3 PM2 processes x 4 GiB (pm2_instances, max_memory_restart_mb)
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ
   vpc_security_group_ids      = [aws_security_group.frontend.id]
   key_name                    = aws_key_pair.frontend.key_name
@@ -49,12 +49,15 @@ resource "aws_instance" "frontend" {
 
   # replace() strips Windows line endings (CRLF), which would break bash on Linux.
   user_data = replace(templatefile("${path.module}/scripts/bootstrap.sh.tftpl", {
-    region            = data.aws_region.current.region
-    bucket_name       = aws_s3_bucket.frontend.id
-    node_major        = var.node_major
-    pm2_version       = var.pm2_version
-    app_port          = var.app_port
-    health_check_path = var.health_check_path
+    region                = data.aws_region.current.region
+    bucket_name           = aws_s3_bucket.frontend.id
+    node_major            = 24 # Please adjust for your need.
+    pm2_version           = var.pm2_version
+    app_port              = var.app_port
+    health_check_path     = var.health_check_path
+    pm2_instances         = 3 # Becareful of this. Check your instance type.
+    node_heap_mb          = var.node_heap_mb
+    max_memory_restart_mb = var.max_memory_restart_mb
   }), "\r\n", "\n")
 
   tags = {
@@ -67,6 +70,11 @@ resource "aws_instance" "frontend" {
   }
 
   lifecycle {
+    precondition {
+      condition     = var.max_memory_restart_mb > var.node_heap_mb
+      error_message = "max_memory_restart_mb must be larger than node_heap_mb: a process's RSS is its heap plus buffers and native memory."
+    }
+
     ignore_changes = [
       ami,       # A newer Ubuntu AMI must never silently replace a running server.
       user_data, # Script edits only apply to new servers.

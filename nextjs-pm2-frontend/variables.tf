@@ -48,22 +48,59 @@ variable "instance_count" {
   description = "Number of Next.js servers, spread round-robin over the private subnets"
 }
 
-variable "instance_type" {
-  type        = string
-  default     = "c8i.large"
-  description = "EC2 instance type of every server (2 vCPU, 4 GiB: PM2 runs one Next.js process per vCPU)"
-}
+# variable "instance_type" {
+#   type        = string
+#   default     = "r8i.xlarge"
+#   description = "EC2 instance type of every server (4 vCPU, 32 GiB: 3 PM2 processes x 4 GiB)"
+# }
 
-variable "node_major" {
-  type        = number
-  default     = 24
-  description = "Node.js major version (latest release of it is installed). Must match the version your release is built with."
-}
+# variable "node_major" {
+#   type        = number
+#   default     = 24
+#   description = "Node.js major version (latest release of it is installed). Must match the version your release is built with."
+# }
 
 variable "pm2_version" {
   type        = string
   default     = "6"
   description = "PM2 version for npm install -g pm2@<this>"
+}
+
+# variable "pm2_instances" {
+#   type        = number
+#   default     = 3
+#   description = <<-EOT
+#     Next.js processes per server (PM2 cluster mode). They share port 3000; PM2 spreads
+#     requests over them. Keep it at or below the vCPU count (r8i.xlarge: 4), since each
+#     process uses one CPU core at most.
+#   EOT
+
+#   validation {
+#     condition     = var.pm2_instances >= 1
+#     error_message = "pm2_instances must be at least 1."
+#   }
+# }
+
+variable "node_heap_mb" {
+  type        = number
+  default     = 3072
+  description = <<-EOT
+    V8 heap limit per Next.js process (--max-old-space-size), in MiB. Budget per server:
+    pm2_instances x max_memory_restart_mb must fit in RAM minus ~2 GiB for the OS, with
+    room for one extra process during pm2 reload. r8i.xlarge (32 GiB): 3 x 4 GiB, of
+    which 3 GiB heap each.
+  EOT
+
+  validation {
+    condition     = var.node_heap_mb >= 256
+    error_message = "node_heap_mb must be at least 256."
+  }
+}
+
+variable "max_memory_restart_mb" {
+  type        = number
+  default     = 4096
+  description = "Total memory per process, in MiB: PM2 restarts a process whose RSS passes this (max_memory_restart). Must be above node_heap_mb."
 }
 
 variable "app_port" {
