@@ -34,7 +34,7 @@ browser ──HTTPS──► CloudFront ──┼─ VPC origin ──► intern
 With static files in S3, **every server must run the exact same build**. `next build` on each
 server gives each one a different build ID and chunks, so a page rendered by frontend-1 can ask for
 JS that only exists on frontend-2, and visitors get errors. So the app is built **once**
-(CI, or one Linux machine), uploaded to S3, and every server downloads that same file.
+(on one Linux machine or WSL), uploaded to S3, and every server downloads that same file.
 Bonus: servers need no git credentials, no build tools, and deploys take seconds.
 
 ## One-time: your Next.js project
@@ -53,7 +53,7 @@ and set `health_check_path = "/api/health"`. The default `/` renders a full page
 ## How to deploy
 
 **1. Release** (build once, upload). From your Next.js project folder, on **Linux x86_64**
-(CI, WSL, or a Linux machine, because `sharp` and other native modules are compiled for the
+(WSL or a Linux machine, because `sharp` and other native modules are compiled for the
 build machine), with **Node.js 24** and AWS credentials of someone in the `web_developers` group:
 
 ```bash
@@ -103,7 +103,7 @@ Then for every new tag:
 ansible-playbook deploy.yml -e version=v1.4.2 -e app_dir=~/code/my-next-app \
   -e bucket=$(terraform -chdir=../.. output -raw frontend_bucket_name)
 
-# Already released (e.g. by CI)? Only deploy:
+# Already released with release.sh? Only deploy:
 ansible-playbook deploy.yml -e version=v1.4.2
 
 # Rollback:
@@ -112,30 +112,6 @@ ansible-playbook deploy.yml -e version=v1.4.1
 
 Servers that already run that version are skipped, so after a failure you can simply fix
 it and run the same command again.
-
-### Release automatically on every tag (GitHub Actions)
-
-Then a tag does the build and upload by itself; you only run the deploy.
-
-```
-git push origin v1.4.2 ──► GitHub Actions: release.sh ──► S3      (automatic)
-ansible-playbook deploy.yml -e version=v1.4.2             (you, over the VPN)
-```
-
-1. In the root `module "nextjs_frontend"` block set `github_repository = "my-org/my-next-app"`
-   and apply. This creates an IAM role that **only `v*` tag runs of that repository** can use,
-   through GitHub's OIDC tokens, so **no AWS keys are stored in GitHub**. If your account
-   already has a GitHub OIDC provider (only one may exist), pass its ARN as
-   `github_oidc_provider_arn`.
-2. In the Next.js repository, copy `github/release.yml` to `.github/workflows/release.yml` and
-   `scripts/release.sh` to `scripts/release.sh` (`chmod +x`, or `git update-index --chmod=+x`).
-3. In that repository's **Settings → Secrets and variables → Actions → Variables**, add
-   `AWS_ROLE_ARN` (`terraform output -raw frontend_github_release_role_arn`), `AWS_REGION` and
-   `FRONTEND_BUCKET` (`terraform output -raw frontend_bucket_name`), plus any `NEXT_PUBLIC_*`
-   build variables (and list them under `env:` in the workflow).
-
-The run summary shows the exact deploy command. The deploy stays manual on purpose: someone
-decides when production changes, and the servers stay reachable only over the VPN.
 
 ## Runtime settings and secrets
 
@@ -227,10 +203,8 @@ PM2 starts on every boot (`pm2-frontend` systemd service) with the last deployed
 | `iam.tf` | Servers: read releases. Deployers: upload releases and static files |
 | `security-groups.tf` | 80 from the VPC to the ALB, 3000 from the ALB, SSH from the VPN |
 | `scripts/bootstrap.sh.tftpl` | First boot: Node.js, PM2, `deploy-frontend`, `frontend-pm2` |
-| `scripts/release.sh` | Build once and upload (run on CI or a Linux machine) |
+| `scripts/release.sh` | Build once and upload (run on WSL or a Linux machine) |
 | `ansible/` | Rolling deploy of a release to all servers, one at a time (`deploy.yml`) |
-| `github-actions.tf` | OIDC role so GitHub Actions can release on `v*` tags (when `github_repository` is set) |
-| `github/release.yml` | Workflow to copy into your Next.js repository |
 
 ## Inputs
 
@@ -247,11 +221,10 @@ PM2 starts on every boot (`pm2-frontend` systemd service) with the last deployed
 | `app_port` / `health_check_path` | `3000` / `"/"` | Next.js port, health check (2xx/3xx = healthy) |
 | `domain_names` / `acm_certificate_arn` | `[]` / `null` | Custom domain (certificate in us-east-1) |
 | `cloudfront_price_class` | `"PriceClass_200"` | Includes Asia |
-| `github_repository` / `github_oidc_provider_arn` | `null` / `null` | Next.js repo that may release on tags; existing OIDC provider to reuse |
 
 ## Outputs
 
-`url`, `cloudfront_domain`, `cloudfront_zone_id`, `distribution_id`, `bucket_name`, `private_ips`, `instance_ids`, `github_release_role_arn`.
+`url`, `cloudfront_domain`, `cloudfront_zone_id`, `distribution_id`, `bucket_name`, `private_ips`, `instance_ids`.
 
 ## TO-DO
 
