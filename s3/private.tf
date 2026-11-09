@@ -4,6 +4,7 @@
 #   backups/kubernetes/  etcd snapshots, deleted after var.backup_retention_days
 #   backups/postgres/    pgBackRest repository; pgBackRest deletes old backups itself
 #   backups/redis/       daily RDB snapshots, deleted after var.backup_retention_days
+#   backups/elasticsearch/ snapshot repository; Elasticsearch (SLM) deletes old snapshots itself
 #   tmp/                 deleted after 7 days
 #   anything else (uploads/, web/, ...) is kept until someone deletes it.
 
@@ -73,7 +74,7 @@ resource "aws_s3_bucket_versioning" "private" {
 # These empty "folder" objects (what the S3 console's "Create folder" makes) only
 # make the backup layout visible before the first backup runs.
 resource "aws_s3_object" "backup_folders" {
-  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/", "backups/redis/"])
+  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/", "backups/redis/", "backups/elasticsearch/"])
 
   bucket  = aws_s3_bucket.private.id
   key     = each.value
@@ -82,9 +83,10 @@ resource "aws_s3_object" "backup_folders" {
 
 locals {
   # prefix => days until objects under it are deleted.
-  # backups/postgres/ is deliberately NOT here: pgBackRest decides which files
-  # are still needed (an old full backup, the WAL newer backups depend on).
-  # Deleting them by age would leave backups that can't be restored.
+  # backups/postgres/ and backups/elasticsearch/ are deliberately NOT here: their
+  # tools decide which files are still needed. pgBackRest keeps an old full backup
+  # and the WAL newer backups depend on; Elasticsearch snapshots share unchanged
+  # segment files with older snapshots. Deleting by age would break restores.
   private_expiring_prefixes = {
     "logs/"               = var.log_retention_days
     "backups/kubernetes/" = var.backup_retention_days
