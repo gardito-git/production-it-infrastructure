@@ -6,19 +6,7 @@ themselves at first boot, so `terraform apply` is the only step.
 
 ## Architecture
 
-```
-                 ┌──────────────────── VPC (private subnets a, b, c) ────────────────────┐
-  apps / you ──► │  Internal NLB  :5432 ─► primary   (health check: GET :8008/primary)   │
-  (pods, VPN)    │                :5433 ─► replicas  (health check: GET :8008/replica)   │
-                 │                                                                       │
-                 │   pg-1 (AZ a)            pg-2 (AZ b)            pg-3 (AZ c)           │
-                 │   10.0.101.20            10.0.102.20            10.0.103.20           │
-                 │   PostgreSQL 18          PostgreSQL 18          PostgreSQL 18         │
-                 │   Patroni ◄────── leader lock in etcd (3 members) ──────► Patroni     │
-                 │      │        streaming replication ◄──── primary ────►      │        │
-                 │      └──────────────── WAL + backups ─► S3 (pgBackRest) ◄────┘        │
-                 └───────────────────────────────────────────────────────────────────────┘
-```
+![PostgreSQL cluster on EC2 - Patroni](postgresql_patroni_ec2_cluster_architecture-bg.png)
 
 | Piece | What it does |
 |---|---|
