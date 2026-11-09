@@ -74,10 +74,36 @@ variable "master_instance_type" {
   description = "Instance type of the 3 master nodes"
 }
 
+variable "master_heap_size" {
+  type        = string
+  default     = "3g"
+  description = "JVM heap of each master node (-Xms and -Xmx), e.g. \"3g\" or \"3072m\". c8i.xlarge has 8 GiB RAM."
+
+  validation {
+    condition     = can(regex("^[0-9]+[mg]$", var.master_heap_size))
+    error_message = "master_heap_size must be a number followed by m or g, e.g. \"3g\"."
+  }
+}
+
 variable "data_instance_type" {
   type        = string
   default     = "r8i.xlarge"
   description = "Instance type of the data nodes (memory-optimized: heap + filesystem cache)"
+}
+
+variable "data_heap_size" {
+  type        = string
+  default     = "14g"
+  description = <<-EOT
+    JVM heap of each data node (-Xms and -Xmx). r8i.xlarge has 32 GiB RAM; keep the heap
+    at or below half of it (the rest is filesystem cache for fast searches) and below
+    ~30g, where the JVM can still use compressed object pointers.
+  EOT
+
+  validation {
+    condition     = can(regex("^[0-9]+[mg]$", var.data_heap_size))
+    error_message = "data_heap_size must be a number followed by m or g, e.g. \"14g\"."
+  }
 }
 
 variable "data_node_count" {
