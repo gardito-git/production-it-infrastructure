@@ -3,14 +3,7 @@
 A highly available Redis: 3 identical `r8i.large` nodes, because AWS ElasiCache is expensive.
 One per AZ in the private subnets. Every node runs **Redis** (data) and **Sentinel** (failover). The nodes bootstrap themselves at first boot, so `terraform apply` is the only step.
 
-```
-                 ┌────────────────── VPC (private subnets a, b, c) ──────────────────┐
-  apps / you ──► │  redis-1 (AZ a)           redis-2 (AZ b)          redis-3 (AZ c)    │
-  (pods, VPN)    │  10.0.101.30              10.0.102.30             10.0.103.30       │
-                 │  Redis :6379  ── master ──► replica               replica           │
-                 │  Sentinel :26379 ◄─────── watch the master, vote (quorum 2) ──────► │
-                 └──────────────────────── daily RDB backup ─► S3 backups/redis/ ─────┘
-```
+![Redis with Sentinel on EC2](redis_sentinel_ec2_cluster_architecture-bg.png)
 
 | Piece | What it does |
 |---|---|
