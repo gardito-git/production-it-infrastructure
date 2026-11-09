@@ -47,11 +47,11 @@ variable "instance_count" {
   description = "Number of web servers, spread round-robin over the private subnets"
 }
 
-variable "instance_type" {
-  type        = string
-  default     = "c8i.large"
-  description = "EC2 instance type of every web server"
-}
+# variable "instance_type" {
+#   type        = string
+#   default     = "c8i.large"
+#   description = "EC2 instance type of every web server"
+# }
 
 variable "certificate_arn" {
   type        = string

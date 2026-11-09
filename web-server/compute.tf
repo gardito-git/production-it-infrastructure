@@ -25,7 +25,7 @@ resource "aws_instance" "web_server" {
   count = var.instance_count
 
   ami                         = data.aws_ami.ubuntu_2404.id
-  instance_type               = var.instance_type
+  instance_type               = "c8i.large" # 2 vCPU, 4 GiB;
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ
   vpc_security_group_ids      = [aws_security_group.web_server.id]
   key_name                    = aws_key_pair.web_server.key_name
