@@ -1,0 +1,31 @@
+#!/bin/bash
+# Terraform renders this template once per instance (templatefile in compute.tf).
+# It writes the node's settings and the scripts from this folder to disk, then
+# runs bootstrap.sh. Output goes to /var/log/es-bootstrap.log.
+# No passwords or keys here: the scripts read them from Secrets Manager at boot.
+set -euo pipefail
+mkdir -p /etc/es-bootstrap /opt/es-bootstrap
+
+cat >/etc/es-bootstrap/env <<'ES_ENV_EOF'
+NODE_ROLE="${node_role}"
+NODE_NAME="${node_name}"
+CLUSTER_NAME="${cluster_name}"
+AWS_REGION="${aws_region}"
+ELASTIC_VERSION="${elastic_version}"
+MASTER_IPS="${master_ips}"
+DATA_IPS="${data_ips}"
+DATA_VOLUME_ID="${data_volume_id}"
+HEAP_SIZE="${heap_size}"
+SECRET_ARN="${secret_arn}"
+BACKUP_BUCKET="${backup_bucket}"
+BACKUP_PREFIX="${backup_prefix}"
+ES_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/es-bootstrap/${name} <<'ES_SCRIPT_EOF'
+${body}
+ES_SCRIPT_EOF
+chmod 0755 /opt/es-bootstrap/${name}
+
+%{ endfor ~}
+/opt/es-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/es-bootstrap.log

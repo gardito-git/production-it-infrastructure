@@ -41,7 +41,7 @@ resource "aws_vpc_security_group_ingress_rule" "es_transport_self" {
   from_port                    = 9300
   to_port                      = 9300
   referenced_security_group_id = aws_security_group.elasticsearch.id
-  description                  = "Elasticsearch transport (TLS), between the nodes only"
+  description                  = "Elasticsearch transport, between the nodes only (this rule decides who may join)"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "es_ssh_from_vpn" {

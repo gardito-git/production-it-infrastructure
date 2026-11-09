@@ -1,6 +1,6 @@
-# Everything secret the nodes need at boot: built-in user passwords, the transport
-# certificate and key, and Kibana's encryption keys. Nodes read it with their
-# IAM role, so none of it is in user data. It's in Terraform state too.
+# Everything secret the nodes need at boot: built-in user passwords and Kibana's
+# encryption keys. Nodes read it with their IAM role, so none of it is in user
+# data. It's in Terraform state too. (No certificates: there are none to manage.)
 
 # special = false: these end up in YAML, keystores and URLs, where some special
 # characters need escaping. 32 letters and digits is still ~190 bits of entropy.
@@ -26,7 +26,7 @@ resource "aws_secretsmanager_secret" "elasticsearch" {
   # name_prefix adds a random suffix: a deleted secret's name stays reserved for
   # the recovery window, so a fixed name would block destroy + re-create.
   name_prefix             = "${local.name_prefix}/elasticsearch/"
-  description             = "Elasticsearch cluster ${local.name_prefix}: passwords, transport certificate and Kibana keys"
+  description             = "Elasticsearch cluster ${local.name_prefix}: passwords and Kibana keys"
   recovery_window_in_days = 7
 }
 
@@ -36,10 +36,6 @@ resource "aws_secretsmanager_secret_version" "elasticsearch" {
     elastic_username       = "elastic"
     elastic_password       = random_password.elastic.result
     kibana_system_password = random_password.kibana_system.result
-
-    ca_crt   = tls_self_signed_cert.ca.cert_pem
-    node_crt = tls_locally_signed_cert.node.cert_pem
-    node_key = tls_private_key.node.private_key_pem
 
     # Field names match the Kibana settings, dots replaced by underscores (kibana.sh).
     kibana_xpack_encryptedSavedObjects_encryptionKey = random_password.kibana_encryption["encryptedSavedObjects"].result
