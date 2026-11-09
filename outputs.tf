@@ -117,3 +117,20 @@ output "redis_secret_arn" {
 output "redis_backup_location" {
   value = module.redis_sentinel.backup_location
 }
+
+output "kibana_url" {
+  description = "Kibana, over the VPN (log in as elastic; password in elasticsearch_secret_arn)"
+  value       = module.elasticsearch_cluster.kibana_url
+}
+
+output "elasticsearch_hosts" {
+  value = module.elasticsearch_cluster.elasticsearch_hosts
+}
+
+output "elasticsearch_secret_arn" {
+  value = module.elasticsearch_cluster.secret_arn
+}
+
+output "elasticsearch_snapshot_location" {
+  value = module.elasticsearch_cluster.snapshot_location
+}

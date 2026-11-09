@@ -23,6 +23,7 @@ is visible before the first backup.
 | `backups/kubernetes/` | 30 days (`backup_retention_days`) | etcd nodes, every 6 h: `backups/kubernetes/etcd/etcd-1/etcd-1-<time>.db.gz` |
 | `backups/postgres/` | **Managed by pgBackRest** (4 weekly fulls + WAL) | PostgreSQL primary |
 | `backups/redis/` | 30 days (`backup_retention_days`) | Redis master, daily: `backups/redis/redis-<time>.rdb.gz` |
+| `backups/elasticsearch/` | **Managed by Elasticsearch** (snapshot policy: 30 days) | Elasticsearch nodes, daily snapshot repository `s3-backups` |
 | `tmp/` | 7 days | Scratch files |
 | `web/` | Until deleted | The web team's own files and backups |
 | anything else | Until deleted | `uploads/`, ... |
@@ -31,10 +32,11 @@ is visible before the first backup.
   (`noncurrent_version_retention_days`). So `logs/` really disappears after 30 + 30 days.
 - **Use `/` in keys, not `\`.** `backups/kubernetes/`, never `Production\Kubernetes`.
   Use one bucket per environment instead of an environment folder.
-- **Never add an age-based lifecycle rule for `backups/postgres/`.** pgBackRest decides which
+- **Never add an age-based lifecycle rule for `backups/postgres/` or `backups/elasticsearch/`.**
+  Elasticsearch snapshots are incremental and share files, and so do pgBackRest backups. pgBackRest decides which
   files are still needed: an old full backup that newer differentials build on, and the WAL
   between them. Deleting them by age leaves backups that can't be restored. Retention is
-  `backup_retention_full` in `postgres-cluster` instead.
+  `backup_retention_full` in `postgres-cluster`, and the snapshot policy in `elasticsearch-cluster`.
 - **Each writer can only reach its own prefix.** The etcd nodes can only upload to
   `backups/kubernetes/etcd/` (no read or delete). The PostgreSQL nodes can only use
   `backups/postgres/`. Versioning keeps deleted files for 30 days in case something goes wrong.
