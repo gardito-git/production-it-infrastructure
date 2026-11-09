@@ -1,19 +1,10 @@
-# Elasticsearch cluster on EC2
+# Elasticsearch Cluster on EC2
 
 3 master nodes, 6 data nodes and 1 Kibana node for internal developer use, because
 Amazon OpenSearch Service is expensive. Everything runs in the private subnets and
 bootstraps itself at first boot, so `terraform apply` is the only step.
 
-```
-                 ┌──────────────────── VPC (private subnets a, b, c) ────────────────────┐
-  apps (pods) ──►│  data nodes :9200 (HTTP + login)                                      │
-                 │   es-data-1 .50 (a)   es-data-2 .50 (b)   es-data-3 .50 (c)           │
-                 │   es-data-4 .51 (a)   es-data-5 .51 (b)   es-data-6 .51 (c)           │
-                 │          ▲ transport :9300 (no cert verification) ▼                   │
-                 │   es-master-1 .40 (a)  es-master-2 .40 (b)  es-master-3 .40 (c)       │
-  you (VPN) ────►│   kibana .60 (a) :5601 ── HTTP + login ──► data nodes                 │
-                 └────────────── daily snapshots ─► S3 backups/elasticsearch/ ───────────┘
-```
+![Elasticsearch Cluster on EC2](elasticsearch_ec2_cluster_architecture-bg.png)
 
 | Node | Count | Type | JVM heap | Storage | Role |
 |---|---|---|---|---|---|
