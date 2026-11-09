@@ -3,6 +3,8 @@
 A VPC across 3 availability zones, plus an AWS Client VPN so you can reach every
 private IP from your laptop with the OpenVPN desktop app.
 
+![VPC](aws_vpc_and_client_vpn_architecture-bg.png)
+
 | Resource | Details |
 |---|---|
 | VPC | `10.0.0.0/16` (`vpc_cidr`), DNS hostnames on |
