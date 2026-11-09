@@ -55,8 +55,9 @@ fi
 chown root:frontend /etc/frontend/app.env
 chmod 640 /etc/frontend/app.env
 
-# PM2 cluster mode: one Next.js process per vCPU, and `pm2 reload` restarts
-# them one at a time, so a deploy drops no requests.
+# PM2 cluster mode: ${pm2_instances} Next.js processes sharing port ${app_port}; PM2
+# spreads requests over them, and `pm2 reload` restarts them one at a time, so a
+# deploy drops no requests.
 cat >/etc/frontend/ecosystem.config.js <<'EOF'
 // Written by the first-boot script. Read by deploy-frontend (pm2 startOrReload).
 const fs = require("fs");
@@ -79,7 +80,13 @@ module.exports = {
       cwd: "/opt/frontend/current",
       script: "server.js", // from next build with output: "standalone"
       exec_mode: "cluster",
-      instances: "max",
+      instances: ${pm2_instances},
+      // Memory, per process (pm2_instances / node_heap_mb / max_memory_restart_mb):
+      //   --max-old-space-size  V8 heap limit; above it Node crashes with "heap out of memory"
+      //   max_memory_restart    PM2 restarts the process when its total RSS passes this
+      // RSS = heap + buffers + native memory, so the restart limit sits above the heap.
+      node_args: "--max-old-space-size=${node_heap_mb}",
+      max_memory_restart: "${max_memory_restart_mb}M",
       listen_timeout: 15000, // a new process has 15 s to start listening
       kill_timeout: 10000, // an old process has 10 s to finish its requests
       env: {
