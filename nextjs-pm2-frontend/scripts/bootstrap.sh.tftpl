@@ -1,0 +1,179 @@
+#!/bin/bash
+# First-boot script (user data), rendered by templatefile() in compute.tf.
+# Installs Node.js and PM2, a "frontend" user that runs the app, and the
+# deploy-frontend command. Then deploys the live version (releases/CURRENT) if
+# one exists, so a replaced server comes up serving the site.
+# Output goes to /var/log/frontend-bootstrap.log.
+set -euo pipefail
+exec > >(tee -a /var/log/frontend-bootstrap.log) 2>&1
+export DEBIAN_FRONTEND=noninteractive
+
+# Ubuntu's AWS images ship the SSM agent. Access is SSH over the VPN instead.
+if snap list amazon-ssm-agent >/dev/null 2>&1; then
+  snap remove amazon-ssm-agent
+fi
+
+# Retry in case the NAT route isn't usable yet at the very first boot.
+for attempt in {1..30}; do
+  apt-get -o DPkg::Lock::Timeout=600 update -q && break
+  echo "apt-get update failed (attempt $attempt), retrying"
+  sleep 10
+done
+apt-get -o DPkg::Lock::Timeout=600 install -y -q curl xz-utils
+snap install aws-cli --classic
+
+# Node.js: the latest ${node_major}.x from nodejs.org, checked against its SHA-256.
+echo "Installing Node.js ${node_major}"
+NODE_BASE=https://nodejs.org/dist/latest-v${node_major}.x
+cd /tmp
+curl -fsSL --retry 5 "$NODE_BASE/SHASUMS256.txt" -o SHASUMS256.txt
+NODE_TARBALL=$(grep -oE 'node-v[0-9.]+-linux-x64\.tar\.xz' SHASUMS256.txt | head -n 1)
+curl -fsSL --retry 5 "$NODE_BASE/$NODE_TARBALL" -o "$NODE_TARBALL"
+grep " $NODE_TARBALL\$" SHASUMS256.txt | sha256sum -c -
+mkdir -p /opt/node
+tar -xJf "$NODE_TARBALL" -C /opt/node --strip-components=1
+rm -f "$NODE_TARBALL" SHASUMS256.txt
+ln -sf /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+cd /
+
+echo "Installing PM2 ${pm2_version}"
+npm install -g --no-fund --no-audit "pm2@${pm2_version}"
+ln -sf /opt/node/bin/pm2 /usr/local/bin/pm2
+
+# The app runs as its own unprivileged user, never root.
+id frontend >/dev/null 2>&1 || useradd --system --create-home --home-dir /home/frontend --shell /usr/sbin/nologin frontend
+mkdir -p /opt/frontend/releases /etc/frontend
+
+# Runtime secrets and settings (DATABASE_URL, API keys...). KEY=value lines,
+# read on every deploy. NEXT_PUBLIC_* variables do NOT belong here: Next.js
+# bakes them into the JS at build time (scripts/release.sh).
+if [[ ! -f /etc/frontend/app.env ]]; then
+  cat >/etc/frontend/app.env <<'EOF'
+# KEY=value, one per line. Applied by: sudo deploy-frontend <version>
+EOF
+fi
+chown root:frontend /etc/frontend/app.env
+chmod 640 /etc/frontend/app.env
+
+# PM2 cluster mode: one Next.js process per vCPU, and `pm2 reload` restarts
+# them one at a time, so a deploy drops no requests.
+cat >/etc/frontend/ecosystem.config.js <<'EOF'
+// Written by the first-boot script. Read by deploy-frontend (pm2 startOrReload).
+const fs = require("fs");
+
+function readEnvFile(file) {
+  const env = {};
+  for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
+    const line = raw.trim();
+    const eq = line.indexOf("=");
+    if (!line || line.startsWith("#") || eq < 1) continue;
+    env[line.slice(0, eq).trim()] = line.slice(eq + 1).trim().replace(/^(['"])(.*)\1$/, "$2");
+  }
+  return env;
+}
+
+module.exports = {
+  apps: [
+    {
+      name: "frontend",
+      cwd: "/opt/frontend/current",
+      script: "server.js", // from next build with output: "standalone"
+      exec_mode: "cluster",
+      instances: "max",
+      listen_timeout: 15000, // a new process has 15 s to start listening
+      kill_timeout: 10000, // an old process has 10 s to finish its requests
+      env: {
+        ...readEnvFile("/etc/frontend/app.env"),
+        NODE_ENV: "production",
+        PORT: "${app_port}",
+        HOSTNAME: "0.0.0.0",
+      },
+    },
+  ],
+};
+EOF
+chmod 644 /etc/frontend/ecosystem.config.js
+
+# deploy-frontend <version>: download releases/<version>.tar.gz, switch the
+# "current" symlink to it, pm2 reload, wait until healthy, record CURRENT.
+cat >/usr/local/bin/deploy-frontend <<'EOF'
+#!/bin/bash
+# Usage: sudo deploy-frontend <version>     e.g. sudo deploy-frontend v1.4.2
+# Rollback is the same command with the previous version.
+set -euo pipefail
+export AWS_DEFAULT_REGION="${region}"
+BUCKET="${bucket_name}"
+APP=/opt/frontend
+PM2=(runuser -u frontend -- env HOME=/home/frontend PM2_HOME=/home/frontend/.pm2 pm2)
+
+VERSION=$${1:?usage: sudo deploy-frontend <version>}
+[[ $VERSION =~ ^[A-Za-z0-9._-]+$ ]] || { echo "invalid version: $VERSION" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || { echo "run with sudo" >&2; exit 1; }
+DIR=$APP/releases/$VERSION
+
+if [[ ! -d $DIR ]]; then
+  echo "Downloading s3://$BUCKET/releases/$VERSION.tar.gz"
+  rm -rf "$DIR.tmp"
+  mkdir -p "$DIR.tmp"
+  aws s3 cp --only-show-errors "s3://$BUCKET/releases/$VERSION.tar.gz" - | tar -xz -C "$DIR.tmp"
+  if [[ ! -f $DIR.tmp/server.js ]]; then
+    rm -rf "$DIR.tmp"
+    echo "server.js missing: build with output: \"standalone\" in next.config" >&2
+    exit 1
+  fi
+  # Next.js writes its image and ISR cache into .next/cache, so the app owns its folder.
+  chown -R frontend:frontend "$DIR.tmp"
+  mv "$DIR.tmp" "$DIR"
+fi
+
+# Atomic switch: "current" points at the old or the new release, never at nothing.
+ln -sfn "$DIR" "$APP/current.tmp"
+mv -T "$APP/current.tmp" "$APP/current"
+
+echo "Reloading PM2"
+"$${PM2[@]}" startOrReload /etc/frontend/ecosystem.config.js --update-env
+
+echo "Waiting for http://127.0.0.1:${app_port}${health_check_path}"
+code=000
+for _ in {1..30}; do
+  code=$(curl -s -o /dev/null -w '%%{http_code}' "http://127.0.0.1:${app_port}${health_check_path}" || true)
+  [[ $code =~ ^[23] ]] && break
+  sleep 2
+done
+if [[ ! $code =~ ^[23] ]]; then
+  echo "UNHEALTHY (HTTP $code). Check: sudo frontend-pm2 logs" >&2
+  echo "Roll back with: sudo deploy-frontend <previous version>" >&2
+  exit 1
+fi
+
+# Survive reboots with this version, and let new servers pick it up.
+"$${PM2[@]}" save
+echo "$VERSION" | aws s3 cp --only-show-errors - "s3://$BUCKET/releases/CURRENT"
+
+# Keep the live release and the 4 newest others on disk, for fast rollbacks.
+LIVE=$(readlink -f "$APP/current")
+ls -1dt "$APP"/releases/*/ | sed 's:/$::' | grep -vxF "$LIVE" | tail -n +5 | xargs -r rm -rf
+
+echo "$VERSION is live on $(hostname)"
+EOF
+chmod 755 /usr/local/bin/deploy-frontend
+
+# A short "pm2" for admins: sudo frontend-pm2 list / logs / monit
+cat >/usr/local/bin/frontend-pm2 <<'EOF'
+#!/bin/bash
+exec runuser -u frontend -- env HOME=/home/frontend PM2_HOME=/home/frontend/.pm2 pm2 "$@"
+EOF
+chmod 755 /usr/local/bin/frontend-pm2
+
+# Start PM2 (as "frontend") on every boot, resurrecting the saved processes.
+pm2 startup systemd -u frontend --hp /home/frontend
+frontend-pm2 install pm2-logrotate || echo "WARNING: pm2-logrotate not installed" # keeps ~frontend/.pm2/logs from filling the disk
+
+# Serve the live version straight away, if there is one.
+export AWS_DEFAULT_REGION="${region}"
+if CURRENT=$(aws s3 cp --only-show-errors "s3://${bucket_name}/releases/CURRENT" - 2>/dev/null); then
+  deploy-frontend "$CURRENT" || echo "WARNING: deploying $CURRENT failed; fix it, then: sudo deploy-frontend <version>"
+else
+  echo "No release yet. Upload one with scripts/release.sh, then: sudo deploy-frontend <version>"
+fi
+echo "Bootstrap finished"
