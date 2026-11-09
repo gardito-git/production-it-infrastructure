@@ -1,11 +1,11 @@
 variable "region" {
-  default     = "us-east-1"
+  default     = "us-east-1" # Please update your AMI data sources if you change this.
   type        = string
   description = "AWS region to deploy into"
 }
 
 variable "project_name" {
-  default     = "example"
+  default     = "example" #  TO-DO
   type        = string
   description = "Project name used in tags and resource names"
 }
