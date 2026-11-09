@@ -1,0 +1,23 @@
+# Dynamic inventory: asks AWS for the running frontend servers on every run, so
+# a replaced server (new IP) is picked up without editing anything.
+# Needs AWS credentials allowed to ec2:DescribeInstances, and boto3.
+#
+#   ansible-inventory --graph      # shows the servers it found
+plugin: amazon.aws.aws_ec2
+
+# EDIT these three to match terraform.tfvars (region, project_name, environment).
+regions:
+  - us-east-1
+filters:
+  tag:Project: example
+  tag:Environment: dev
+  tag:Role: nextjs-frontend # set in nextjs-pm2-frontend/compute.tf
+  instance-state-name: running
+
+# Host names frontend-1, -2, -3 (from the Name tag), reached by private IP over the VPN.
+hostnames:
+  - tag:Name
+compose:
+  ansible_host: private_ip_address
+groups:
+  frontend: true

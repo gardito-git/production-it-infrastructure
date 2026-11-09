@@ -1,0 +1,66 @@
+# Rolling deploy of one release to every frontend server, one server at a time.
+#
+#   ansible-playbook deploy.yml -e version=v1.4.2
+#
+# Build and deploy in one go (WSL/Linux; runs scripts/release.sh first):
+#   ansible-playbook deploy.yml -e version=v1.4.2 -e app_dir=~/code/my-next-app \
+#     -e bucket=$(terraform -chdir=../.. output -raw frontend_bucket_name)
+#
+# Rollback: the same command with the previous version.
+
+- name: Release (build once and upload), only when app_dir is given
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check the version
+      ansible.builtin.assert:
+        that:
+          - version is defined
+          - version is match('^[A-Za-z0-9._-]+$')
+          - version != 'CURRENT'
+          - app_dir is not defined or bucket is defined
+        fail_msg: "Pass -e version=v1.4.2 (and -e bucket=... together with -e app_dir=...)"
+
+    - name: Build and upload {{ version }}
+      when: app_dir is defined
+      ansible.builtin.command:
+        cmd: "{{ playbook_dir }}/../scripts/release.sh {{ version }} {{ bucket }}"
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+- name: Deploy {{ version }} to the frontend servers
+  hosts: frontend
+  become: true
+  gather_facts: false
+  # One server at a time; the first failure stops the whole run, so at most one
+  # server is ever on a broken version while the other two keep serving.
+  serial: 1
+  any_errors_fatal: true
+  max_fail_percentage: 0
+  order: sorted
+
+  tasks:
+    - name: Find the version this server runs
+      ansible.builtin.command: readlink -f /opt/frontend/current
+      register: live
+      changed_when: false
+      failed_when: false
+
+    - name: Deploy (download, pm2 reload, wait until healthy)
+      when: (live.stdout | basename) != version
+      ansible.builtin.command: deploy-frontend {{ version }}
+      register: deploy
+      changed_when: true
+
+    - name: Show the result
+      when: deploy is changed
+      ansible.builtin.debug:
+        msg: "{{ deploy.stdout_lines | last }}"
+
+    # deploy-frontend already checked localhost; give the ALB time to see the
+    # server healthy again before the next one reloads.
+    - name: Let the load balancer settle
+      when: deploy is changed
+      ansible.builtin.pause:
+        seconds: 20
