@@ -122,7 +122,7 @@ resource "aws_ebs_volume" "data" {
   type              = "gp3"
   size              = 200
   iops              = 3000
-  throughput        = 125
+  throughput        = 250
   encrypted         = true
 
   tags = {
