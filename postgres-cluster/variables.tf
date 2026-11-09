@@ -46,29 +46,29 @@ variable "ssh_source_security_group_id" {
   description = "Security group allowed to SSH to the nodes: the VPN endpoint's (module.vpc.vpn_security_group_id)"
 }
 
-variable "instance_type" {
-  type        = string
-  default     = "r8i.xlarge"
-  description = "Same for all 3 nodes, because any node can become the primary. r8i.xlarge = 4 vCPU, 32 GiB."
-}
+# variable "instance_type" {
+#   type        = string
+#   default     = "r8i.xlarge"
+#   description = "Same for all 3 nodes, because any node can become the primary. r8i.xlarge = 4 vCPU, 32 GiB."
+# }
 
-variable "data_volume_size" {
-  type        = number
-  default     = 200
-  description = "Size in GiB of each node's gp3 data volume. Can be grown later, never shrunk."
-}
+# variable "data_volume_size" {
+#   type        = number
+#   default     = 200
+#   description = "Size in GiB of each node's gp3 data volume. Can be grown later, never shrunk."
+# }
 
-variable "data_volume_iops" {
-  type        = number
-  default     = 3000
-  description = "Provisioned IOPS of each data volume (gp3 includes 3000 free)"
-}
+# variable "data_volume_iops" {
+#   type        = number
+#   default     = 3000
+#   description = "Provisioned IOPS of each data volume (gp3 includes 3000 free)"
+# }
 
-variable "data_volume_throughput" {
-  type        = number
-  default     = 250
-  description = "Throughput in MiB/s of each data volume (gp3 includes 125 free)"
-}
+# variable "data_volume_throughput" {
+#   type        = number
+#   default     = 250
+#   description = "Throughput in MiB/s of each data volume (gp3 includes 125 free)"
+# }
 
 variable "postgres_version" {
   type        = string

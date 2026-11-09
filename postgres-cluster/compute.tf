@@ -62,7 +62,7 @@ resource "aws_instance" "postgres" {
   count = 3
 
   ami                         = local.ami_id
-  instance_type               = var.instance_type
+  instance_type               = "r8i.xlarge" # 4 vCPU, 32 GiB; same for all nodes because any can become primary
   subnet_id                   = var.private_subnet_ids[count.index]
   private_ip                  = local.node_ips[count.index]
   vpc_security_group_ids      = [aws_security_group.postgres.id]
@@ -120,9 +120,9 @@ resource "aws_ebs_volume" "data" {
 
   availability_zone = data.aws_subnet.private[count.index].availability_zone
   type              = "gp3"
-  size              = var.data_volume_size
-  iops              = var.data_volume_iops
-  throughput        = var.data_volume_throughput
+  size              = 200
+  iops              = 3000
+  throughput        = 125
   encrypted         = true
 
   tags = {
