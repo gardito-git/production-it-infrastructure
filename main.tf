@@ -73,3 +73,22 @@ module "postgres_cluster" {
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id
 }
+
+module "redis_sentinel" {
+  source = "./redis-sentinel"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id               = module.vpc.vpc_id
+  vpc_cidr             = module.vpc.vpc_cidr
+  private_subnet_ids   = module.vpc.private_subnet_ids
+  private_subnet_cidrs = module.vpc.private_subnet_cidrs
+
+  # Daily RDB backups -> s3://<private bucket>/backups/redis/
+  backup_bucket_name = module.s3.private_bucket_name
+  backup_bucket_arn  = module.s3.private_bucket_arn
+
+  ssh_public_key               = var.ssh_public_key
+  ssh_source_security_group_id = module.vpc.vpn_security_group_id
+}

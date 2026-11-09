@@ -13,7 +13,7 @@ avoid clashing with somebody else's bucket.
 ## Private bucket
 
 Organise it with key prefixes. S3 has no real folders: a prefix exists as soon as a
-file is uploaded under it. `backups/`, `backups/kubernetes/` and `backups/postgres/` are
+file is uploaded under it. `backups/`, `backups/kubernetes/`, `backups/postgres/` and `backups/redis/` are
 created as empty "folder" objects (like the S3 console's "Create folder") so the layout
 is visible before the first backup.
 
@@ -22,6 +22,7 @@ is visible before the first backup.
 | `logs/` | 30 days (`log_retention_days`) | e.g. `logs/nginx/2026-11-05.gz` |
 | `backups/kubernetes/` | 30 days (`backup_retention_days`) | etcd nodes, every 6 h: `backups/kubernetes/etcd/etcd-1/etcd-1-<time>.db.gz` |
 | `backups/postgres/` | **Managed by pgBackRest** (4 weekly fulls + WAL) | PostgreSQL primary |
+| `backups/redis/` | 30 days (`backup_retention_days`) | Redis master, daily: `backups/redis/redis-<time>.rdb.gz` |
 | `tmp/` | 7 days | Scratch files |
 | `web/` | Until deleted | The web team's own files and backups |
 | anything else | Until deleted | `uploads/`, ... |

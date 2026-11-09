@@ -3,6 +3,7 @@
 #   logs/                deleted after var.log_retention_days
 #   backups/kubernetes/  etcd snapshots, deleted after var.backup_retention_days
 #   backups/postgres/    pgBackRest repository; pgBackRest deletes old backups itself
+#   backups/redis/       daily RDB snapshots, deleted after var.backup_retention_days
 #   tmp/                 deleted after 7 days
 #   anything else (uploads/, web/, ...) is kept until someone deletes it.
 
@@ -72,7 +73,7 @@ resource "aws_s3_bucket_versioning" "private" {
 # These empty "folder" objects (what the S3 console's "Create folder" makes) only
 # make the backup layout visible before the first backup runs.
 resource "aws_s3_object" "backup_folders" {
-  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/"])
+  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/", "backups/redis/"])
 
   bucket  = aws_s3_bucket.private.id
   key     = each.value
@@ -87,7 +88,9 @@ locals {
   private_expiring_prefixes = {
     "logs/"               = var.log_retention_days
     "backups/kubernetes/" = var.backup_retention_days
-    "tmp/"                = 7
+    # Each Redis RDB file is a complete snapshot, so deleting old ones by age is safe.
+    "backups/redis/" = var.backup_retention_days
+    "tmp/"           = 7
   }
 }
 
