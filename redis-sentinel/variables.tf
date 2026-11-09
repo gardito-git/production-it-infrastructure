@@ -62,17 +62,17 @@ variable "backup_prefix" {
   description = "Key prefix (\"folder\") for the RDB backups, without leading or trailing slash"
 }
 
-variable "instance_type" {
-  type        = string
-  default     = "r8i.large"
-  description = "Same for all 3 nodes, because any node can become the master. r8i.large = 2 vCPU, 16 GiB."
-}
+# variable "instance_type" {
+#   type        = string
+#   default     = "r8i.large"
+#   description = "Same for all 3 nodes, because any node can become the master. r8i.large = 2 vCPU, 16 GiB."
+# }
 
-variable "data_volume_size" {
-  type        = number
-  default     = 50
-  description = "Size in GiB of each node's gp3 volume for RDB snapshots and the AOF. Keep it at least 2-3x the RAM."
-}
+# variable "data_volume_size" {
+#   type        = number
+#   default     = 50
+#   description = "Size in GiB of each node's gp3 volume for RDB snapshots and the AOF. Keep it at least 2-3x the RAM."
+# }
 
 variable "redis_version" {
   type        = string

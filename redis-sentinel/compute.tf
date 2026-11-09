@@ -58,7 +58,7 @@ resource "aws_instance" "redis" {
   count = 3
 
   ami                         = data.aws_ami.ubuntu_2404.id
-  instance_type               = var.instance_type
+  instance_type               = "r8i.large" # 2 vCPU, 16 GiB; because it sentinel mode.
   subnet_id                   = var.private_subnet_ids[count.index]
   private_ip                  = local.node_ips[count.index]
   vpc_security_group_ids      = [aws_security_group.redis.id]
@@ -115,7 +115,7 @@ resource "aws_ebs_volume" "data" {
 
   availability_zone = data.aws_subnet.private[count.index].availability_zone
   type              = "gp3"
-  size              = var.data_volume_size
+  size              = 50
   encrypted         = true
 
   tags = {
