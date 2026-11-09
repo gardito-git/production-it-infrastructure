@@ -4,4 +4,5 @@ TO-DO
 2. Kubernetes Cluster on EC2 (kubeadm + external etcd)
 3. PostgreSQL cluster on EC2 (Patroni)
 4. Web Server Nginx on EC2 behind an Application Load Balancer
-5. Redis Sentinel on EC2
+5. NextJS on EC2 behind an Application Load Balancer with S3 and Cloudfront
+6. Redis Sentinel on EC2
