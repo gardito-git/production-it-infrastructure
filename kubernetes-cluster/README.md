@@ -12,7 +12,7 @@ boot, so `terraform apply` is the only step.
 | Worker | 6 | `r8i.xlarge` | 100 GB gp3 | `worker` |
 | External etcd | 3 | `c8i.large` | 30 GB gp3 | `etcd` |
 
-![Kubernetes cluster on EC2 (kubeadm + external etcd)](k8s_ec2_kubeadm_external_etcd_architecture-removebg-preview.png)
+![Kubernetes cluster on EC2 (kubeadm + external etcd)](k8s_ec2_kubeadm_external_etcd_architecture-bg.png)
 
 - **All nodes are in private subnets** with no public IPs. You reach them by connecting
   the AWS Client VPN (see [vpc/README.md](../vpc/README.md)) and SSHing to their private
