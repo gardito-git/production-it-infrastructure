@@ -66,7 +66,7 @@ resource "aws_instance" "master" {
   count = 3
 
   ami                         = data.aws_ami.ubuntu_2404.id
-  instance_type               = var.master_instance_type
+  instance_type               = "c8i.xlarge" # 4 vCPU, 8 GiB; 3 GiB for heap_size, 1 GiB for OS and off-heap caches
   subnet_id                   = var.private_subnet_ids[count.index]
   private_ip                  = local.master_ips[count.index]
   vpc_security_group_ids      = [aws_security_group.elasticsearch.id]
@@ -92,7 +92,7 @@ resource "aws_instance" "master" {
   # Gzipped: cloud-init unzips it, and it keeps the scripts well under EC2's 16 KB limit.
   user_data_base64 = base64gzip(templatefile("${path.module}/scripts/user-data.sh.tftpl", merge(local.user_data_vars, {
     node_role      = "master"
-    heap_size      = var.master_heap_size
+    heap_size      = "3g" # 3 GiB, leaving 1 GiB for the OS and Elasticsearch's off-heap caches
     node_name      = "es-master-${count.index + 1}"
     data_volume_id = ""
   })))
@@ -121,7 +121,7 @@ resource "aws_instance" "data" {
   count = var.data_node_count
 
   ami                         = data.aws_ami.ubuntu_2404.id
-  instance_type               = var.data_instance_type
+  instance_type               = "r8i.xlarge" # 4 vCPU, 32 GiB; 14 GiB for heap_size, 2GiB for OS and off-heap caches
   subnet_id                   = var.private_subnet_ids[count.index % local.subnet_count]
   private_ip                  = local.data_ips[count.index]
   vpc_security_group_ids      = [aws_security_group.elasticsearch.id]
@@ -146,7 +146,7 @@ resource "aws_instance" "data" {
 
   user_data_base64 = base64gzip(templatefile("${path.module}/scripts/user-data.sh.tftpl", merge(local.user_data_vars, {
     node_role      = "data"
-    heap_size      = var.data_heap_size
+    heap_size      = "14g" # 14 GiB, leaving 2 GiB for the OS and Elasticsearch's off-heap caches
     node_name      = "es-data-${count.index + 1}"
     data_volume_id = aws_ebs_volume.data[count.index].id
   })))
@@ -176,7 +176,9 @@ resource "aws_ebs_volume" "data" {
 
   availability_zone = data.aws_subnet.private[count.index % local.subnet_count].availability_zone
   type              = "gp3"
-  size              = var.data_volume_size
+  size              = 100
+  iops              = 3000
+  throughput        = 250
   encrypted         = true
 
   tags = {
@@ -198,7 +200,7 @@ resource "aws_volume_attachment" "data" {
 # Kibana: the web UI for developers, reachable only over the VPN.
 resource "aws_instance" "kibana" {
   ami                         = data.aws_ami.ubuntu_2404.id
-  instance_type               = var.kibana_instance_type
+  instance_type               = "c8i.large" # 2 vCPU, 4 GiB; Kibana is Node.js, not a JVM
   subnet_id                   = var.private_subnet_ids[0]
   private_ip                  = local.kibana_ip
   vpc_security_group_ids      = [aws_security_group.kibana.id]
