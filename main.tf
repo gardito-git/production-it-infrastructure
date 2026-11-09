@@ -127,10 +127,6 @@ module "nextjs_frontend" {
   # The web team may upload releases and static files.
   deployer_group_name = module.s3.web_developers_group
 
-  # Your Next.js repo ("owner/name"): its v* tags release through GitHub Actions
-  # (nextjs-pm2-frontend/github/release.yml). null = no CI role.
-  # github_repository = null
-
   # Your own domain: ACM certificate in us-east-1 (see nextjs-pm2-frontend/README.md).
   domain_names        = []
   acm_certificate_arn = null

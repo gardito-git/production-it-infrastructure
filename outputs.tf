@@ -157,8 +157,3 @@ output "frontend_private_ips" {
   description = "SSH over the VPN, then: sudo deploy-frontend <version>"
   value       = module.nextjs_frontend.private_ips
 }
-
-output "frontend_github_release_role_arn" {
-  description = "AWS_ROLE_ARN variable for the Next.js repository's release workflow"
-  value       = module.nextjs_frontend.github_release_role_arn
-}
