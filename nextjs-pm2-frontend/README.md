@@ -20,8 +20,9 @@ browser ──HTTPS──► CloudFront ──┼─ VPC origin ──► intern
 | `/_next/image*` (next/image) | Next.js | Per image, width, quality and format |
 | Everything else (pages, API routes, server actions) | Next.js | No, always fresh |
 
-- **3 servers** (`c8i.large`, one per AZ), Ubuntu 24.04, Node.js 24 and PM2 in **cluster mode**:
-  one Next.js process per vCPU, running as the unprivileged `frontend` user.
+- **3 servers** (`r8i.xlarge`: 4 vCPU, 32 GiB, one per AZ), Ubuntu 24.04, Node.js 24 and PM2 in
+  **cluster mode**: **3 Next.js processes per server, 4 GiB each**, running as the unprivileged
+  `frontend` user. That's 9 processes in total behind the ALB.
 - **The ALB is internal** (no public IP). CloudFront reaches it through a
   [VPC origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html),
   so nobody can skip CloudFront and hit the servers or the ALB directly.
@@ -143,6 +144,42 @@ one `KEY=value` per line, then `sudo deploy-frontend <current version>` to apply
 `NEXT_PUBLIC_*` variables are different: Next.js bakes them into the JS **at build time**, so
 they must be set when you run `release.sh`.
 
+## PM2 cluster mode and memory
+
+Each server runs **3 Next.js processes** (PM2 calls them *instances*; they're ordinary Node.js
+processes, not containers). They all listen on port 3000 together: PM2's cluster mode hands
+incoming connections to them in turn, so the ALB still sees one target per server.
+
+```
+ALB ──► frontend-1 :3000 ──► PM2 ─┬─ Next.js #0  (max 4 GiB)
+                                  ├─ Next.js #1  (max 4 GiB)
+                                  └─ Next.js #2  (max 4 GiB)
+```
+
+Why several processes: one Node.js process uses one CPU core at most. Three processes use
+three of the four vCPUs; the fourth is left for the OS, PM2 and the image optimizer (`sharp`).
+If one process crashes or is restarted for memory, the other two keep serving.
+
+| Variable | Default | PM2 setting | What happens at the limit |
+|---|---|---|---|
+| `pm2_instances` | `3` | `instances: 3` | Processes per server. Keep it ≤ vCPUs (4) |
+| `node_heap_mb` | `3072` | `node_args: --max-old-space-size=3072` | Node's garbage collector works harder, then the process crashes ("heap out of memory") and PM2 restarts it |
+| `max_memory_restart_mb` | `4096` | `max_memory_restart: 4096M` | PM2 restarts the process gracefully (checked about every 30 s) |
+
+**Memory budget on `r8i.xlarge` (32 GiB):** 3 × 4 GiB = 12 GiB, plus 4 GiB for the one extra
+process that briefly exists during `pm2 reload` (new one starts before the old one stops), plus
+~2 GiB for the OS = 18 GiB. Plenty of headroom. `max_memory_restart` is total memory (RSS:
+heap + buffers + native code), so it must be above the heap; Terraform refuses otherwise.
+
+A process restarting often for memory (`sudo frontend-pm2 list`, the restart count ↺) means a
+leak or a too-small limit; check `sudo frontend-pm2 monit` before simply raising it.
+
+**Changing it on running servers:** new values only reach new servers (user data runs once).
+On a running one, edit `instances` / `node_args` / `max_memory_restart` in `/etc/frontend/ecosystem.config.js`,
+then `sudo frontend-pm2 delete frontend && sudo deploy-frontend <live version>`. A plain
+`pm2 reload` keeps the old process options. This restarts that server's processes at once, so
+do one server at a time and wait until the ALB shows it healthy again.
+
 ## Operating
 
 ```bash
@@ -203,8 +240,10 @@ PM2 starts on every boot (`pm2-frontend` systemd service) with the last deployed
 | `vpc_id`, `vpc_cidr`, `private_subnet_ids` | (required) | The VPC and its private subnets |
 | `ssh_public_key`, `ssh_source_security_group_id` | (required) | SSH key; the VPN may SSH in |
 | `deployer_group_name` | `null` | IAM group that may release (root: `web_developers`) |
-| `instance_count` / `instance_type` | `3` / `"c8i.large"` | Servers |
-| `node_major` / `pm2_version` | `24` / `"6"` | Must match what you build with |
+| `instance_count` | `3` | Servers (type `r8i.xlarge`, set in `compute.tf`) |
+| `pm2_version` | `"6"` | Node.js major (24) is set in `compute.tf`; must match what you build with |
+| `pm2_instances` | `3` | Next.js processes per server (cluster mode) |
+| `node_heap_mb` / `max_memory_restart_mb` | `3072` / `4096` | Per process: V8 heap, and PM2 restart at this RSS (MiB) |
 | `app_port` / `health_check_path` | `3000` / `"/"` | Next.js port, health check (2xx/3xx = healthy) |
 | `domain_names` / `acm_certificate_arn` | `[]` / `null` | Custom domain (certificate in us-east-1) |
 | `cloudfront_price_class` | `"PriceClass_200"` | Includes Asia |
