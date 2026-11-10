@@ -2,14 +2,15 @@ locals {
   name_prefix = "${var.project_name}-${var.environment}"
 }
 
-# Two groups: the internet may reach the ALB, and only the ALB may reach the servers.
+# Two groups: CloudFront (through its VPC origin) may reach the ALB, and only the
+# ALB may reach the servers.
 # Every rule is its own resource, as in the other modules.
 
 # Load balancer
 
 resource "aws_security_group" "alb" {
   name        = "${local.name_prefix}-web-alb"
-  description = "Public web load balancer"
+  description = "Internal web load balancer, reached by CloudFront VPC origin"
   vpc_id      = var.vpc_id
 
   tags = {
@@ -17,18 +18,16 @@ resource "aws_security_group" "alb" {
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "alb_public" {
-  for_each = {
-    http  = 80
-    https = 443
-  }
-
+# CloudFront's VPC origin connects from network interfaces inside the VPC, so
+# the VPC CIDR is the source. The ALB has no public IP, so nothing outside the
+# VPC can use this rule.
+resource "aws_vpc_security_group_ingress_rule" "alb_from_vpc" {
   security_group_id = aws_security_group.alb.id
   ip_protocol       = "tcp"
-  from_port         = each.value
-  to_port           = each.value
-  cidr_ipv4         = "0.0.0.0/0"
-  description       = "${upper(each.key)} from the internet"
+  from_port         = 80
+  to_port           = 80
+  cidr_ipv4         = var.vpc_cidr
+  description       = "HTTP from CloudFront VPC origin (inside the VPC)"
 }
 
 resource "aws_vpc_security_group_egress_rule" "alb_to_web" {

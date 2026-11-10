@@ -1,3 +1,8 @@
+locals {
+  # /etc/nginx/sites-available/<this>.conf, e.g. example.com.conf
+  nextjs_site_name = length(var.nextjs_server_names) > 0 ? var.nextjs_server_names[0] : "nextjs-frontend"
+}
+
 data "aws_ami" "ubuntu_2404" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -19,8 +24,8 @@ resource "aws_key_pair" "web_server" {
   public_key = var.ssh_public_key
 }
 
-# The servers sit in private subnets with no public IP: the internet can only
-# reach them through the load balancer, and they reach the internet via NAT.
+# The servers sit in private subnets with no public IP: visitors reach them only
+# through CloudFront and the internal load balancer; they reach the internet via NAT.
 resource "aws_instance" "web_server" {
   count = var.instance_count
 
@@ -47,7 +52,14 @@ resource "aws_instance" "web_server" {
 
   # replace() strips Windows line endings (CRLF), which would break bash on Linux.
   user_data = replace(templatefile("${path.module}/scripts/nginx.sh.tftpl", {
-    vpc_cidr = var.vpc_cidr
+    vpc_cidr         = var.vpc_cidr
+    nextjs_site_name = local.nextjs_site_name
+    # The Next.js reverse-proxy site; empty when there are no upstreams.
+    nextjs_site_conf = length(var.nextjs_upstreams) == 0 ? "" : templatefile("${path.module}/scripts/nextjs-site.conf.tftpl", {
+      upstreams    = var.nextjs_upstreams
+      server_names = var.nextjs_server_names
+      app_port     = split(":", var.nextjs_upstreams[0])[1]
+    })
   }), "\r\n", "\n")
 
   tags = {

@@ -1,0 +1,53 @@
+# Next.js frontend, written by the web-server's first-boot script.
+# Lives in /etc/nginx/sites-available/, enabled by a symlink in sites-enabled/.
+#
+#   CloudFront ──► web ALB ──► this Nginx ──► Next.js servers (PM2, port ${app_port})
+#
+# Change it on all web servers the same way, one at a time:
+#   sudo nginx -t && sudo systemctl reload nginx
+
+upstream nextjs_frontend {
+%{ for server in upstreams ~}
+    server ${server} max_fails=3 fail_timeout=10s;
+%{ endfor ~}
+
+    # Reuse connections to Next.js instead of opening one per request.
+    keepalive 32;
+}
+
+server {
+    listen 80;
+
+    # Your domains, plus *.cloudfront.net: CloudFront forwards the visitor's Host
+    # header, which is the d1234.cloudfront.net address until you add a domain.
+    # Requests for any other Host go to the default site (test page, /healthz).
+    server_name ${join(" ", concat(server_names, ["*.cloudfront.net"]))};
+
+    # Largest request body Next.js accepts (forms, uploads through API routes).
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://nextjs_frontend;
+
+        # HTTP/1.1 with an empty Connection header keeps upstream connections open.
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        # Next.js needs the visitor's Host: server actions reject requests whose
+        # Origin doesn't match it, and redirects use it.
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Visitors always reach CloudFront over HTTPS (it redirects HTTP), even
+        # though the hops behind it are plain HTTP inside the VPC.
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 60s;
+
+        # A Next.js server that is down or restarting: retry the request on the
+        # next one. Only safe (GET/HEAD) requests are retried, never a POST.
+        proxy_next_upstream error timeout http_502 http_503;
+        proxy_next_upstream_tries 2;
+    }
+}

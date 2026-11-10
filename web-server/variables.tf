@@ -18,17 +18,12 @@ variable "vpc_id" {
 
 variable "vpc_cidr" {
   type        = string
-  description = "VPC CIDR. Nginx trusts X-Forwarded-For only from here (the load balancer)."
-}
-
-variable "public_subnet_ids" {
-  type        = list(string)
-  description = "Public subnets for the load balancer, at least 2 AZs (module.vpc.public_subnet_ids)"
+  description = "VPC CIDR. The ALB accepts CloudFront's VPC origin from here, and Nginx trusts X-Forwarded-For only from here."
 }
 
 variable "private_subnet_ids" {
   type        = list(string)
-  description = "Private subnets the servers are spread across, one per AZ (module.vpc.private_subnet_ids)"
+  description = "Private subnets for the internal ALB and the servers, one per AZ (module.vpc.private_subnet_ids)"
 }
 
 variable "ssh_public_key" {
@@ -53,12 +48,14 @@ variable "instance_count" {
 #   description = "EC2 instance type of every web server"
 # }
 
-variable "certificate_arn" {
-  type        = string
-  default     = null
-  description = <<-EOT
-    ACM certificate for HTTPS (must be in the same region as the load balancer).
-    Leave null to serve plain HTTP only. When set, port 443 serves HTTPS and
-    port 80 redirects to it.
-  EOT
+variable "nextjs_upstreams" {
+  type        = list(string)
+  default     = []
+  description = "Next.js servers as \"ip:port\" (module.nextjs_frontend.upstream_servers). Empty = no Next.js site in Nginx."
+}
+
+variable "nextjs_server_names" {
+  type        = list(string)
+  default     = []
+  description = "Domains Nginx serves the Next.js site for, e.g. [\"example.com\", \"www.example.com\"]. *.cloudfront.net is always added."
 }

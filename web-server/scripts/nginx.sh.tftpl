@@ -46,6 +46,13 @@ EOF
 # Don't reveal the Nginx version in headers and error pages.
 sed -i 's/# server_tokens off;/server_tokens off;/' /etc/nginx/nginx.conf
 
+%{ if nextjs_site_conf != "" ~}
+# Reverse proxy for the Next.js frontend: sites-available/ holds the file,
+# sites-enabled/ a symlink to it (the Ubuntu convention for turning a site on/off).
+cat >/etc/nginx/sites-available/${nextjs_site_name}.conf <<'EOF'
+${nextjs_site_conf}EOF
+ln -sf /etc/nginx/sites-available/${nextjs_site_name}.conf /etc/nginx/sites-enabled/${nextjs_site_name}.conf
+%{ endif ~}
 nginx -t
 systemctl enable nginx
 systemctl reload-or-restart nginx

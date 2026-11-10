@@ -1,13 +1,18 @@
 # Values this module hands back to its caller, read as module.web_server.<name>.
 
 output "alb_dns_name" {
-  description = "Public DNS name of the load balancer: point your domain at it (CNAME, or a Route 53 alias)"
+  description = "Internal DNS name of the load balancer: the CloudFront origin domain (resolves to private IPs)"
   value       = aws_lb.web.dns_name
 }
 
-output "alb_zone_id" {
-  description = "Hosted zone ID of the load balancer, for a Route 53 alias record"
-  value       = aws_lb.web.zone_id
+output "cloudfront_vpc_origin_id" {
+  description = "Use as vpc_origin_id in a CloudFront distribution's origin to reach this ALB"
+  value       = aws_cloudfront_vpc_origin.web.id
+}
+
+output "security_group_id" {
+  description = "The Nginx servers' security group, for rules that let them reach upstreams"
+  value       = aws_security_group.web_server.id
 }
 
 output "private_ips" {
