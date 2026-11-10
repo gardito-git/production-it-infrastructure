@@ -1,6 +1,6 @@
 # Redis with Sentinel on EC2
 
-A highly available Redis: 3 identical `r8i.large` nodes, because AWS ElasiCache is expensive.
+A self-managed, highly available Redis: 3 identical `r8i.large` nodes, because AWS ElasiCache is expensive.
 One per AZ in the private subnets. Every node runs **Redis** (data) and **Sentinel** (failover). The nodes bootstrap themselves at first boot, so `terraform apply` is the only step.
 
 ![Redis with Sentinel on EC2](redis_sentinel_ec2_cluster_architecture-bg.png)

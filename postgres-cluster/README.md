@@ -1,6 +1,6 @@
 # PostgreSQL cluster on EC2 (Patroni)
 
-A highly available PostgreSQL cluster on plain EC2, because Amazon RDS / Aurora
+A self-managed, highly available PostgreSQL cluster on plain EC2, because Amazon RDS / Aurora
 cost too much for this project. Three identical nodes, one per AZ, bootstrap
 themselves at first boot, so `terraform apply` is the only step.
 

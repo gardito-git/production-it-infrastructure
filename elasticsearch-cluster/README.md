@@ -1,6 +1,6 @@
 # Elasticsearch Cluster on EC2
 
-3 master nodes, 6 data nodes and 1 Kibana node for internal developer use, because
+A self-managed, highly available Elastic Cluster, 3 master nodes, 6 data nodes and 1 Kibana node for internal developer use, because
 Amazon OpenSearch Service is expensive. Everything runs in the private subnets and
 bootstraps itself at first boot, so `terraform apply` is the only step.
 
