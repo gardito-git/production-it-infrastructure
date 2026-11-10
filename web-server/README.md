@@ -14,6 +14,7 @@ browser ──HTTPS──► CloudFront ────┼─ VPC origin ──► 
 you (VPN) ──22────────────────────┼──► web-1/2/3                                                                 │
                                   └──────────────────────────────────────────────────────────────────────────────┘
 ```
+![Nginx](web_server_nginx_internal_alb_architecture-bg.png)
 
 | Piece | Details |
 |---|---|
