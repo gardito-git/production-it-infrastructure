@@ -282,4 +282,5 @@ PM2 starts on every boot (`pm2-frontend` systemd service) with the last deployed
 ## TO-DO
 
 - [ ] AWS WAF on the distribution (rate limiting, managed rule sets)
-- [ ] CloudFront caching for public, same-for-everyone pages
+- [ ] Caching (shared Redis cache, CloudFront for public pages, image TTL): waiting for the
+      Frontend team's answers in [QUESTION.md](QUESTION.md)
