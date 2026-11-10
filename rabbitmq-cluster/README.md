@@ -13,6 +13,7 @@ first boot, so `terraform apply` is the only step.
   you (VPN) ────►│  :15672 management UI, :22 SSH                                         │
                  └──────── daily definitions export ─► S3 backups/rabbitmq/ ──────────────┘
 ```
+![RabbitMQ](rabbitmq_ec2_cluster_architecture-bg.png)
 
 | | |
 |---|---|
