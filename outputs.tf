@@ -157,3 +157,25 @@ output "frontend_private_ips" {
   description = "SSH over the VPN, then: sudo deploy-frontend <version>"
   value       = module.nextjs_frontend.private_ips
 }
+
+output "rabbitmq_amqp_endpoints" {
+  description = "AMQP addresses of the 3 RabbitMQ nodes: give apps all of them"
+  value       = module.rabbitmq_cluster.amqp_endpoints
+}
+
+output "rabbitmq_management_url" {
+  description = "RabbitMQ management UI, over the VPN (admin password in rabbitmq_secret_arn)"
+  value       = module.rabbitmq_cluster.management_url
+}
+
+output "rabbitmq_node_private_ips" {
+  value = module.rabbitmq_cluster.node_private_ips
+}
+
+output "rabbitmq_secret_arn" {
+  value = module.rabbitmq_cluster.secret_arn
+}
+
+output "rabbitmq_backup_location" {
+  value = module.rabbitmq_cluster.backup_location
+}
