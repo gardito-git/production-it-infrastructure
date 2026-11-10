@@ -26,14 +26,15 @@ module "web_server" {
 
   vpc_id             = module.vpc.vpc_id
   vpc_cidr           = module.vpc.vpc_cidr
-  public_subnet_ids  = module.vpc.public_subnet_ids  # the load balancer
-  private_subnet_ids = module.vpc.private_subnet_ids # the servers
+  private_subnet_ids = module.vpc.private_subnet_ids # internal ALB and servers
 
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id
 
-  # Set to an ACM certificate ARN to enable HTTPS (port 80 then redirects to 443).
-  certificate_arn = null
+  # Nginx reverse-proxies the Next.js frontend:
+  #   CloudFront -> this internal ALB -> Nginx -> Next.js servers (fixed IPs .70)
+  nextjs_upstreams    = module.nextjs_frontend.upstream_servers
+  nextjs_server_names = module.nextjs_frontend.domain_names
 }
 
 module "kubernetes_cluster" {
@@ -117,9 +118,14 @@ module "nextjs_frontend" {
   project_name = var.project_name
   environment  = var.environment
 
-  vpc_id             = module.vpc.vpc_id
-  vpc_cidr           = module.vpc.vpc_cidr
-  private_subnet_ids = module.vpc.private_subnet_ids # internal ALB and servers
+  vpc_id               = module.vpc.vpc_id
+  private_subnet_ids   = module.vpc.private_subnet_ids
+  private_subnet_cidrs = module.vpc.private_subnet_cidrs # fixed IPs .70
+
+  # Pages go CloudFront -> web-server ALB (VPC origin) -> Nginx -> Next.js.
+  origin_domain_name      = module.web_server.alb_dns_name
+  origin_vpc_origin_id    = module.web_server.cloudfront_vpc_origin_id
+  proxy_security_group_id = module.web_server.security_group_id
 
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id
