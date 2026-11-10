@@ -14,6 +14,7 @@ browser ──HTTPS──► CloudFront ──┼─ VPC origin ──► web AL
                      │          └────────────────────────────────────────────────────────────────────────────────────┘
                      └─ /_next/static/* ──► S3 bucket (private, read by CloudFront only)
 ```
+![NextJS](nextjs_pm2_cloudfront_ec2_architecture-bg.png)
 
 | Path | Served by | Cached at the edge |
 |---|---|---|
