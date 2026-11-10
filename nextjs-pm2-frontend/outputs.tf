@@ -32,3 +32,13 @@ output "private_ips" {
 output "instance_ids" {
   value = aws_instance.frontend[*].id
 }
+
+output "upstream_servers" {
+  description = "\"ip:port\" of every Next.js server, for Nginx's upstream (module.web_server nextjs_upstreams)"
+  value       = [for ip in local.private_ips : "${ip}:${var.app_port}"]
+}
+
+output "domain_names" {
+  description = "The site's domains, for Nginx's server_name"
+  value       = var.domain_names
+}

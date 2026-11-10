@@ -13,17 +13,32 @@ variable "environment" {
 
 variable "vpc_id" {
   type        = string
-  description = "VPC for the load balancer and servers (module.vpc.vpc_id)"
-}
-
-variable "vpc_cidr" {
-  type        = string
-  description = "VPC CIDR. CloudFront's VPC origin reaches the internal load balancer from IPs inside it."
+  description = "VPC for the security group (module.vpc.vpc_id)"
 }
 
 variable "private_subnet_ids" {
   type        = list(string)
-  description = "Private subnets for the internal load balancer and the servers, at least 2 AZs (module.vpc.private_subnet_ids)"
+  description = "Private subnets the servers are spread over, one per AZ (module.vpc.private_subnet_ids)"
+}
+
+variable "private_subnet_cidrs" {
+  type        = list(string)
+  description = "CIDRs of private_subnet_ids, same order. Used to give the servers fixed IPs (.70), which Nginx's upstream lists."
+}
+
+variable "origin_domain_name" {
+  type        = string
+  description = "CloudFront origin for pages: the web-server module's internal ALB (module.web_server.alb_dns_name)"
+}
+
+variable "origin_vpc_origin_id" {
+  type        = string
+  description = "CloudFront VPC origin of that ALB (module.web_server.cloudfront_vpc_origin_id)"
+}
+
+variable "proxy_security_group_id" {
+  type        = string
+  description = "Security group of the Nginx servers, allowed to reach Next.js (module.web_server.security_group_id)"
 }
 
 variable "ssh_public_key" {
@@ -85,10 +100,9 @@ variable "node_heap_mb" {
   type        = number
   default     = 3072
   description = <<-EOT
-    V8 heap limit per Next.js process (--max-old-space-size), in MiB. Budget per server:
-    pm2_instances x max_memory_restart_mb must fit in RAM minus ~2 GiB for the OS, with
-    room for one extra process during pm2 reload. r8i.xlarge (32 GiB): 3 x 4 GiB, of
-    which 3 GiB heap each.
+    V8 heap limit per Next.js process (--max-old-space-size), in MiB. Keep it below
+    max_memory_restart_mb: buffers and native memory (e.g. sharp for next/image) come
+    on top of the heap. r8i.xlarge (32 GiB): 3 processes x 4 GiB, of which 3 GiB heap.
   EOT
 
   validation {
@@ -100,7 +114,7 @@ variable "node_heap_mb" {
 variable "max_memory_restart_mb" {
   type        = number
   default     = 4096
-  description = "Total memory per process, in MiB: PM2 restarts a process whose RSS passes this (max_memory_restart). Must be above node_heap_mb."
+  description = "Total memory per process, in MiB: PM2 restarts a process whose RSS passes this (max_memory_restart). Must be above node_heap_mb, and pm2_instances x this + 2 GiB must fit in RAM (checked at plan)."
 }
 
 variable "app_port" {
@@ -112,7 +126,7 @@ variable "app_port" {
 variable "health_check_path" {
   type        = string
   default     = "/"
-  description = "Path the load balancer and deploy-frontend check. Any 2xx/3xx counts as healthy. A cheap /api/health route is better than a full page."
+  description = "Path deploy-frontend checks after each deploy. Any 2xx/3xx counts as healthy. A cheap /api/health route is better than a full page."
 }
 
 variable "domain_names" {

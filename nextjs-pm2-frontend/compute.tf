@@ -1,3 +1,23 @@
+locals {
+  # Sized together: pm2_instances x max_memory_restart_mb + ~2 GiB for the OS
+  # must fit in the instance's RAM (checked below at plan time).
+  instance_type = "r8i.xlarge" # 4 vCPU, 32 GiB RAM
+  pm2_instances = 3            # Becareful of this. Check your instance type.
+
+  # Fixed private IPs: .70 in each private subnet (.71 for a 4th-6th server).
+  # Nginx's upstream lists them, and a replaced server keeps its IP, so the
+  # Nginx config never needs to change.
+  private_ips = [
+    for i in range(var.instance_count) :
+    cidrhost(var.private_subnet_cidrs[i % length(var.private_subnet_cidrs)], 70 + floor(i / length(var.private_subnet_cidrs)))
+  ]
+}
+
+# RAM and vCPUs of local.instance_type, for the memory check on the servers.
+data "aws_ec2_instance_type" "frontend" {
+  instance_type = local.instance_type
+}
+
 data "aws_ami" "ubuntu_2404" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -26,8 +46,9 @@ resource "aws_instance" "frontend" {
   count = var.instance_count
 
   ami                         = data.aws_ami.ubuntu_2404.id
-  instance_type               = "r8i.xlarge" # 4 vCPU, 32 GiB RAM: 3 PM2 processes x 4 GiB (pm2_instances, max_memory_restart_mb)
+  instance_type               = local.instance_type
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ
+  private_ip                  = local.private_ips[count.index]
   vpc_security_group_ids      = [aws_security_group.frontend.id]
   key_name                    = aws_key_pair.frontend.key_name
   iam_instance_profile        = aws_iam_instance_profile.frontend.name
@@ -55,7 +76,7 @@ resource "aws_instance" "frontend" {
     pm2_version           = var.pm2_version
     app_port              = var.app_port
     health_check_path     = var.health_check_path
-    pm2_instances         = 3 # Becareful of this. Check your instance type.
+    pm2_instances         = local.pm2_instances
     node_heap_mb          = var.node_heap_mb
     max_memory_restart_mb = var.max_memory_restart_mb
   }), "\r\n", "\n")
@@ -73,6 +94,18 @@ resource "aws_instance" "frontend" {
     precondition {
       condition     = var.max_memory_restart_mb > var.node_heap_mb
       error_message = "max_memory_restart_mb must be larger than node_heap_mb: a process's RSS is its heap plus buffers and native memory."
+    }
+
+    # Every process at its limit at once, plus ~2 GiB for the OS, must fit in RAM;
+    # otherwise the kernel's OOM killer stops processes before PM2 can restart them.
+    precondition {
+      condition     = local.pm2_instances * var.max_memory_restart_mb + 2048 <= data.aws_ec2_instance_type.frontend.memory_size
+      error_message = "${local.pm2_instances} processes x ${var.max_memory_restart_mb} MiB + 2048 MiB for the OS is more than the ${data.aws_ec2_instance_type.frontend.memory_size} MiB RAM of ${local.instance_type}. Lower max_memory_restart_mb or pm2_instances, or pick a larger instance type."
+    }
+
+    precondition {
+      condition     = local.pm2_instances <= data.aws_ec2_instance_type.frontend.default_vcpus
+      error_message = "pm2_instances (${local.pm2_instances}) is more than the ${data.aws_ec2_instance_type.frontend.default_vcpus} vCPUs of ${local.instance_type}; each Node.js process uses one core at most."
     }
 
     ignore_changes = [

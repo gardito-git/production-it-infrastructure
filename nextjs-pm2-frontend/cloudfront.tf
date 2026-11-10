@@ -2,32 +2,15 @@
 #
 #   browser ──HTTPS──► CloudFront
 #                        ├─ /_next/static/*  ──► S3 (cached 1 year; files are hashed)
-#                        ├─ /_next/image*    ──► ALB (cached per url/width/quality)
-#                        └─ everything else  ──► ALB ──► Next.js (not cached: SSR, API, server actions)
+#                        ├─ /_next/image*    ──► web ALB ──► Nginx ──► Next.js (cached per url/width/quality)
+#                        └─ everything else  ──► web ALB ──► Nginx ──► Next.js (not cached: SSR, API, server actions)
+#
+# The web ALB is the web-server module's internal ALB; CloudFront reaches it
+# through that module's VPC origin. Nginx then proxies to the Next.js servers
+# (web-server/scripts/nextjs-site.conf.tftpl).
 #
 # The servers then only render pages; the heavy, repetitive traffic (JS, CSS,
 # fonts, optimized images) is answered by CloudFront's edge.
-
-# CloudFront reaches the internal ALB through ENIs it places in your private
-# subnets. The ALB needs no public IP and no internet-facing listener.
-resource "aws_cloudfront_vpc_origin" "alb" {
-  vpc_origin_endpoint_config {
-    name                   = "${local.name_prefix}-frontend-alb"
-    arn                    = aws_lb.frontend.arn
-    http_port              = 80
-    https_port             = 443
-    origin_protocol_policy = "http-only"
-
-    origin_ssl_protocols {
-      items    = ["TLSv1.2"]
-      quantity = 1
-    }
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-frontend-alb"
-  }
-}
 
 resource "aws_cloudfront_origin_access_control" "frontend" {
   name                              = "${local.name_prefix}-frontend"
@@ -99,11 +82,11 @@ resource "aws_cloudfront_distribution" "frontend" {
   aliases         = var.domain_names
 
   origin {
-    origin_id   = "alb"
-    domain_name = aws_lb.frontend.dns_name
+    origin_id   = "web"
+    domain_name = var.origin_domain_name
 
     vpc_origin_config {
-      vpc_origin_id            = aws_cloudfront_vpc_origin.alb.id
+      vpc_origin_id            = var.origin_vpc_origin_id
       origin_keepalive_timeout = 5
       origin_read_timeout      = 30
     }
@@ -129,7 +112,7 @@ resource "aws_cloudfront_distribution" "frontend" {
 
   ordered_cache_behavior {
     path_pattern               = "/_next/image*"
-    target_origin_id           = "alb"
+    target_origin_id           = "web"
     viewer_protocol_policy     = "redirect-to-https"
     allowed_methods            = ["GET", "HEAD", "OPTIONS"]
     cached_methods             = ["GET", "HEAD"]
@@ -142,7 +125,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   # Pages, API routes, server actions: always fresh from Next.js. All methods,
   # because forms and server actions POST.
   default_cache_behavior {
-    target_origin_id           = "alb"
+    target_origin_id           = "web"
     viewer_protocol_policy     = "redirect-to-https"
     allowed_methods            = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods             = ["GET", "HEAD"]

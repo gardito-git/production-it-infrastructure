@@ -8,9 +8,10 @@ but I don't write Typescript, sorry I'm too lazy. IF your Frontend Team are real
 ## What it builds
 
 ```
-                                ┌──────────────────── VPC (private subnets a, b, c) ───────────────────┐
-browser ──HTTPS──► CloudFront ──┼─ VPC origin ──► internal ALB :80 ──► frontend-1/2/3 :3000 (PM2)     │
-                     │          └──────────────────────────────────────────────────────────────────────┘
+                                ┌─────────────────────────── VPC (private subnets a, b, c) ──────────────────────────┐
+browser ──HTTPS──► CloudFront ──┼─ VPC origin ──► web ALB :80 ──► web-1/2/3 Nginx ──► frontend-1/2/3 .70:3000 (PM2) │
+                     │          │                 (web-server module)    upstream nextjs_frontend                      │
+                     │          └────────────────────────────────────────────────────────────────────────────────────┘
                      └─ /_next/static/* ──► S3 bucket (private, read by CloudFront only)
 ```
 
@@ -21,11 +22,14 @@ browser ──HTTPS──► CloudFront ──┼─ VPC origin ──► intern
 | Everything else (pages, API routes, server actions) | Next.js | No, always fresh |
 
 - **3 servers** (`r8i.xlarge`: 4 vCPU, 32 GiB, one per AZ), Ubuntu 24.04, Node.js 24 and PM2 in
-  **cluster mode**: **3 Next.js processes per server, 4 GiB each**, running as the unprivileged
-  `frontend` user. That's 9 processes in total behind the ALB.
-- **The ALB is internal** (no public IP). CloudFront reaches it through a
-  [VPC origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html),
-  so nobody can skip CloudFront and hit the servers or the ALB directly.
+  **cluster mode**: **3 Next.js processes per server, up to 4 GiB each**, running as the unprivileged
+  `frontend` user. That's 9 processes in total.
+- **No load balancer of its own.** Pages go through the **web-server module**: its internal ALB
+  (reached by CloudFront through a
+  [VPC origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html))
+  and its Nginx servers, which reverse-proxy to the Next.js servers. Nobody can skip CloudFront.
+- **Fixed private IPs** (`.70` in each private subnet, e.g. `10.0.101.70`), because Nginx's
+  `upstream` lists them. A replaced server comes back on the same IP, so Nginx never needs editing.
 - **HTTPS** at CloudFront: free `*.cloudfront.net` certificate, or your domain (see Custom domain).
 - **SSH only over the VPN**, IMDSv2 only, encrypted disks, same as the other modules.
 
@@ -48,7 +52,8 @@ module.exports = {
 ```
 
 Optional but recommended: a cheap health route, e.g. `app/api/health/route.js` returning `ok`,
-and set `health_check_path = "/api/health"`. The default `/` renders a full page every 10 s per ALB node.
+and set `health_check_path = "/api/health"`. `deploy-frontend` checks it after every deploy; the
+default `/` renders a full page.
 
 ## How to deploy
 
@@ -120,16 +125,54 @@ one `KEY=value` per line, then `sudo deploy-frontend <current version>` to apply
 `NEXT_PUBLIC_*` variables are different: Next.js bakes them into the JS **at build time**, so
 they must be set when you run `release.sh`.
 
+## The Nginx reverse proxy
+
+The web-server module writes the site at first boot from
+[`web-server/scripts/nextjs-site.conf.tftpl`](../web-server/scripts/nextjs-site.conf.tftpl) to
+`/etc/nginx/sites-available/<first domain>.conf` (e.g. `example.com.conf`, or
+`nextjs-frontend.conf` without a domain), enabled by a symlink in `sites-enabled/`:
+
+```nginx
+upstream nextjs_frontend {
+    server 10.0.101.70:3000 max_fails=3 fail_timeout=10s;
+    server 10.0.102.70:3000 max_fails=3 fail_timeout=10s;
+    server 10.0.103.70:3000 max_fails=3 fail_timeout=10s;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name example.com www.example.com *.cloudfront.net;
+
+    location / {
+        proxy_pass http://nextjs_frontend;
+        proxy_set_header Host $host;               # Next.js server actions need it
+        proxy_set_header X-Forwarded-Proto https;  # visitors always use HTTPS at CloudFront
+        proxy_next_upstream error timeout http_502 http_503;  # GET retried on another server
+        ...
+    }
+}
+```
+
+- **Server IPs and domains come from Terraform** (`upstream_servers`, `domain_names`), so adding a
+  domain or a 4th server is a Terraform change, not a hand edit.
+- **`*.cloudfront.net` is always in `server_name`:** CloudFront forwards the visitor's `Host`, which
+  is the `d1234.cloudfront.net` address until you add your own domain. Any other `Host` lands on
+  Nginx's default site (the test page and `/healthz` for the ALB health check).
+- **Nginx only notices a dead Next.js server when a request fails** (open-source Nginx has no
+  active health checks). It then skips that server for 10 s and retries GET requests on another,
+  so visitors rarely see it. A POST is never retried (it could run twice).
+
 ## PM2 cluster mode and memory
 
 Each server runs **3 Next.js processes** (PM2 calls them *instances*; they're ordinary Node.js
 processes, not containers). They all listen on port 3000 together: PM2's cluster mode hands
-incoming connections to them in turn, so the ALB still sees one target per server.
+incoming connections to them in turn, so Nginx still sees one upstream server per machine.
 
 ```
-ALB ──► frontend-1 :3000 ──► PM2 ─┬─ Next.js #0  (max 4 GiB)
-                                  ├─ Next.js #1  (max 4 GiB)
-                                  └─ Next.js #2  (max 4 GiB)
+Nginx ──► frontend-1 :3000 ──► PM2 ─┬─ Next.js #0  (max 4 GiB)
+                                    ├─ Next.js #1  (max 4 GiB)
+                                    └─ Next.js #2  (max 4 GiB)
 ```
 
 Why several processes: one Node.js process uses one CPU core at most. Three processes use
@@ -138,14 +181,22 @@ If one process crashes or is restarted for memory, the other two keep serving.
 
 | Variable | Default | PM2 setting | What happens at the limit |
 |---|---|---|---|
-| `pm2_instances` | `3` | `instances: 3` | Processes per server. Keep it ≤ vCPUs (4) |
+| `local.pm2_instances` (`compute.tf`) | `3` | `instances: 3` | Processes per server. Must be ≤ vCPUs (4) |
 | `node_heap_mb` | `3072` | `node_args: --max-old-space-size=3072` | Node's garbage collector works harder, then the process crashes ("heap out of memory") and PM2 restarts it |
 | `max_memory_restart_mb` | `4096` | `max_memory_restart: 4096M` | PM2 restarts the process gracefully (checked about every 30 s) |
 
-**Memory budget on `r8i.xlarge` (32 GiB):** 3 × 4 GiB = 12 GiB, plus 4 GiB for the one extra
-process that briefly exists during `pm2 reload` (new one starts before the old one stops), plus
-~2 GiB for the OS = 18 GiB. Plenty of headroom. `max_memory_restart` is total memory (RSS:
-heap + buffers + native code), so it must be above the heap; Terraform refuses otherwise.
+**Memory budget on `r8i.xlarge` (32 GiB):** 3 × 4 GiB = 12 GiB, plus ~2 GiB for the OS = 14 GiB,
+leaving ~18 GiB for the OS file cache. During `pm2 reload` a new process starts before the old
+one stops, but it starts small (a few hundred MiB). `terraform plan` refuses settings that
+can't fit (`pm2_instances × max_memory_restart_mb + 2 GiB > RAM`, read from the instance type)
+or more processes than vCPUs, so with 3 processes the ceiling on this instance is ~9 GiB each.
+`max_memory_restart` is total memory (RSS: heap + buffers + native code, e.g. `sharp` resizing
+images), so it must stay above the heap.
+
+**Why not much bigger:** Node.js pauses a process now and then to clean up its heap (garbage
+collection), and the bigger the heap, the longer the pauses; every request on that process
+waits. A Next.js process normally needs well under 1–2 GiB, so if one keeps hitting 4 GiB,
+look for a leak first (data kept in module-level variables or caches that never shrink).
 
 A process restarting often for memory (`sudo frontend-pm2 list`, the restart count ↺) means a
 leak or a too-small limit; check `sudo frontend-pm2 monit` before simply raising it.
@@ -154,7 +205,7 @@ leak or a too-small limit; check `sudo frontend-pm2 monit` before simply raising
 On a running one, edit `instances` / `node_args` / `max_memory_restart` in `/etc/frontend/ecosystem.config.js`,
 then `sudo frontend-pm2 delete frontend && sudo deploy-frontend <live version>`. A plain
 `pm2 reload` keeps the old process options. This restarts that server's processes at once, so
-do one server at a time and wait until the ALB shows it healthy again.
+do one server at a time and wait until `deploy-frontend` reports it healthy.
 
 ## Operating
 
@@ -188,20 +239,21 @@ PM2 starts on every boot (`pm2-frontend` systemd service) with the last deployed
   `aws cloudfront create-invalidation --distribution-id <id> --paths "/_next/image*"`.
 - **Server actions need the real `Host` header**, which is why CloudFront forwards all viewer
   headers to Next.js (`Managed-AllViewer`). Don't change that policy to one that drops `Host`.
-- **The ALB accepts port 80 from the VPC CIDR.** CloudFront's VPC origin connects from IPs inside
-  the VPC; the ALB has no public IP, so the internet can't use that rule.
+- **Port 3000 is open only to the Nginx servers' security group.** Nothing else, not even the
+  rest of the VPC, can reach Next.js directly.
+- **Creating it:** `terraform apply` builds the Next.js and Nginx servers together; the web
+  servers' user data already contains the `.70` upstreams, so no ordering is needed.
 - **`user_data` and `ami` are ignored after creation:** script changes apply to new servers only.
 
 ## Files
 
 | File | What's in it |
 |---|---|
-| `compute.tf` | AMI, key pair, the servers |
-| `alb.tf` | Internal ALB, target group (port 3000), health check |
-| `cloudfront.tf` | VPC origin, distribution, cache behaviors, next/image cache policy |
+| `compute.tf` | AMI, key pair, the servers and their fixed IPs (`.70`) |
+| `cloudfront.tf` | Distribution (origins: web-server ALB and S3), cache behaviors, next/image cache policy |
 | `s3.tf` | Bucket for `_next/static/` and `releases/`, CloudFront-only read policy |
 | `iam.tf` | Servers: read releases. Deployers: upload releases and static files |
-| `security-groups.tf` | 80 from the VPC to the ALB, 3000 from the ALB, SSH from the VPN |
+| `security-groups.tf` | 3000 from the Nginx servers, SSH from the VPN |
 | `scripts/bootstrap.sh.tftpl` | First boot: Node.js, PM2, `deploy-frontend`, `frontend-pm2` |
 | `scripts/release.sh` | Build once and upload (run on WSL or a Linux machine) |
 | `ansible/` | Rolling deploy of a release to all servers, one at a time (`deploy.yml`) |
@@ -211,20 +263,21 @@ PM2 starts on every boot (`pm2-frontend` systemd service) with the last deployed
 | Name | Default | Description |
 |---|---|---|
 | `project_name`, `environment` | (required) | Used in resource names |
-| `vpc_id`, `vpc_cidr`, `private_subnet_ids` | (required) | The VPC and its private subnets |
+| `vpc_id`, `private_subnet_ids`, `private_subnet_cidrs` | (required) | The VPC and its private subnets (fixed IPs `.70`) |
+| `origin_domain_name`, `origin_vpc_origin_id` | (required) | The web-server ALB and its CloudFront VPC origin |
+| `proxy_security_group_id` | (required) | The Nginx servers, allowed to reach port 3000 |
 | `ssh_public_key`, `ssh_source_security_group_id` | (required) | SSH key; the VPN may SSH in |
 | `deployer_group_name` | `null` | IAM group that may release (root: `web_developers`) |
-| `instance_count` | `3` | Servers (type `r8i.xlarge`, set in `compute.tf`) |
+| `instance_count` | `3` | Servers. Type (`r8i.xlarge`) and PM2 processes per server (3) are locals in `compute.tf` |
 | `pm2_version` | `"6"` | Node.js major (24) is set in `compute.tf`; must match what you build with |
-| `pm2_instances` | `3` | Next.js processes per server (cluster mode) |
 | `node_heap_mb` / `max_memory_restart_mb` | `3072` / `4096` | Per process: V8 heap, and PM2 restart at this RSS (MiB) |
-| `app_port` / `health_check_path` | `3000` / `"/"` | Next.js port, health check (2xx/3xx = healthy) |
+| `app_port` / `health_check_path` | `3000` / `"/"` | Next.js port; path `deploy-frontend` checks (2xx/3xx = healthy) |
 | `domain_names` / `acm_certificate_arn` | `[]` / `null` | Custom domain (certificate in us-east-1) |
 | `cloudfront_price_class` | `"PriceClass_200"` | Includes Asia |
 
 ## Outputs
 
-`url`, `cloudfront_domain`, `cloudfront_zone_id`, `distribution_id`, `bucket_name`, `private_ips`, `instance_ids`.
+`url`, `cloudfront_domain`, `cloudfront_zone_id`, `distribution_id`, `bucket_name`, `private_ips`, `instance_ids`, `upstream_servers`, `domain_names`.
 
 ## TO-DO
 
