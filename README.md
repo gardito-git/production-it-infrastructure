@@ -3,6 +3,6 @@ TO-DO
 1. VPC (With VPN)
 2. Kubernetes Cluster on EC2 (kubeadm + external etcd)
 3. PostgreSQL cluster on EC2 (Patroni)
-4. Web Server Nginx on EC2 behind an Application Load Balancer
-5. NextJS on EC2 behind an Application Load Balancer with S3 and Cloudfront
+4. Web Server Nginx on EC2 behind CloudFront and an internal Application Load Balancer
+5. NextJS on EC2 (PM2) behind the Nginx web servers, with S3 and CloudFront
 6. Redis Sentinel on EC2

@@ -89,7 +89,7 @@ output "kubernetes_etcd_backup_location" {
 }
 
 output "web_alb_dns_name" {
-  description = "Public address of the web load balancer: point your domain at it"
+  description = "Internal web load balancer (CloudFront's origin). Point your domain at frontend_cloudfront_domain instead."
   value       = module.web_server.alb_dns_name
 }
 
