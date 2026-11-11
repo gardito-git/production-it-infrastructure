@@ -179,3 +179,16 @@ output "rabbitmq_secret_arn" {
 output "rabbitmq_backup_location" {
   value = module.rabbitmq_cluster.backup_location
 }
+
+output "github_runner_secret_arn" {
+  description = "Put the GitHub token here once (see github-runner/README.md)"
+  value       = module.github_runner.secret_arn
+}
+
+output "github_runner_names" {
+  value = module.github_runner.runner_names
+}
+
+output "github_runner_private_ips" {
+  value = module.github_runner.private_ips
+}

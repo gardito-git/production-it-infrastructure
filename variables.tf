@@ -37,3 +37,8 @@ variable "ssh_public_key" {
     error_message = "ssh_public_key must be a public key line starting with ssh-ed25519, ssh-rsa or ecdsa-sha2-*. Never the private key."
   }
 }
+
+variable "github_runner_scope" {
+  type        = string
+  description = "Where the self-hosted GitHub Actions runners register: your organization (\"my-org\") or one repository (\"my-org/my-repo\")"
+}

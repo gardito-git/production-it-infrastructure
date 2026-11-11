@@ -6,3 +6,6 @@ ssh_public_key = "ssh-ed25519 AAAA... you@laptop"
 
 # One OpenVPN profile is created per name.
 vpn_client_names = ["admin"]
+
+# GitHub organization (or "org/repo") the self-hosted Actions runners register with.
+github_runner_scope = "my-org"

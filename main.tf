@@ -156,3 +156,24 @@ module "rabbitmq_cluster" {
   ssh_public_key        = var.ssh_public_key
   vpn_security_group_id = module.vpc.vpn_security_group_id # SSH and management UI
 }
+
+module "github_runner" {
+  source = "./github-runner"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  # Your GitHub organization ("my-org") or one repository ("my-org/my-repo").
+  github_scope = var.github_runner_scope
+
+  # What jobs may do in AWS (through the runners' IAM role, no keys in GitHub).
+  policy_arns = {
+    frontend_deployer = module.nextjs_frontend.deployer_policy_arn # release.sh uploads
+  }
+
+  ssh_public_key               = var.ssh_public_key
+  ssh_source_security_group_id = module.vpc.vpn_security_group_id
+}
