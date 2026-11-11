@@ -9,7 +9,7 @@
 # Assets are at https://<cloudfront_domain>/<key>, e.g. /js/app.3f9a1c.js
 
 resource "aws_s3_bucket" "public" {
-  bucket        = "${local.name_prefix}-public-${local.account_id}"
+  bucket        = "${local.name_prefix}-public"
   force_destroy = false
 
   tags = {

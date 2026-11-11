@@ -20,7 +20,7 @@ locals {
 }
 
 resource "aws_s3_bucket" "private" {
-  bucket = "${local.name_prefix}-private-${local.account_id}"
+  bucket = "${local.name_prefix}-private"
 
   # `terraform destroy` fails while the bucket holds objects, instead of
   # deleting backups silently. Empty it by hand if you really mean it.
