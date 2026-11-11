@@ -33,6 +33,7 @@ variable "ssh_source_security_group_id" {
 
 variable "github_scope" {
   type        = string
+  # default     = "my-org/my-repo" # TO-DO
   description = <<-EOT
     Where the runners register: an organization ("my-org"), so every repository in it can
     use them, or one repository ("my-org/my-repo"). A personal account without an
