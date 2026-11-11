@@ -192,3 +192,25 @@ output "github_runner_names" {
 output "github_runner_private_ips" {
   value = module.github_runner.private_ips
 }
+
+output "harbor_public_ip" {
+  description = "Create the public DNS A record for Harbor pointing here"
+  value       = module.harbor.public_ip
+}
+
+output "harbor_private_ip" {
+  value = module.harbor.private_ip
+}
+
+output "harbor_url" {
+  description = "Harbor UI, over the VPN"
+  value       = module.harbor.url
+}
+
+output "harbor_bucket_name" {
+  value = module.harbor.bucket_name
+}
+
+output "harbor_secret_arn" {
+  value = module.harbor.secret_arn
+}

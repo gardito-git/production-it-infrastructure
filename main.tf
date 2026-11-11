@@ -177,3 +177,20 @@ module "github_runner" {
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id
 }
+
+module "harbor" {
+  source = "./harbor"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id           = module.vpc.vpc_id
+  vpc_cidr         = module.vpc.vpc_cidr
+  public_subnet_id = module.vpc.public_subnet_ids[0] # the server has an Elastic IP
+
+  # Change to your real name. Then create its public A record (output harbor_public_ip).
+  domain_name = "harbor.example.com"
+
+  ssh_public_key        = var.ssh_public_key
+  vpn_security_group_id = module.vpc.vpn_security_group_id
+}
