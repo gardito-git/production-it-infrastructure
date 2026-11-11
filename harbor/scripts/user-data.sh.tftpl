@@ -1,0 +1,28 @@
+#!/bin/bash
+# Terraform renders this template (templatefile in compute.tf). It writes the
+# server's settings and the scripts from this folder to disk, then runs
+# bootstrap.sh. Output goes to /var/log/harbor-bootstrap.log.
+# No passwords here: the scripts read them from Secrets Manager at boot.
+set -euo pipefail
+mkdir -p /etc/harbor-bootstrap /opt/harbor-bootstrap
+
+cat >/etc/harbor-bootstrap/env <<'HARBOR_ENV_EOF'
+AWS_REGION="${aws_region}"
+DOMAIN_NAME="${domain_name}"
+PUBLIC_IP="${public_ip}"
+VPC_CIDR="${vpc_cidr}"
+HARBOR_VERSION="${harbor_version}"
+HARBOR_INSTALLER_SHA256="${harbor_installer_sha256}"
+S3_BUCKET="${s3_bucket}"
+DATA_VOLUME_ID="${data_volume_id}"
+SECRET_ARN="${secret_arn}"
+HARBOR_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/harbor-bootstrap/${name} <<'HARBOR_SCRIPT_EOF'
+${body}
+HARBOR_SCRIPT_EOF
+chmod 0755 /opt/harbor-bootstrap/${name}
+
+%{ endfor ~}
+/opt/harbor-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/harbor-bootstrap.log
