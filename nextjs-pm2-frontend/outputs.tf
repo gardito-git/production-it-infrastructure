@@ -42,3 +42,8 @@ output "domain_names" {
   description = "The site's domains, for Nginx's server_name"
   value       = var.domain_names
 }
+
+output "deployer_policy_arn" {
+  description = "IAM policy to upload releases and static files (for people or CI runners)"
+  value       = aws_iam_policy.deployer.arn
+}
