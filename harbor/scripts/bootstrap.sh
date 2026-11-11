@@ -1,0 +1,17 @@
+#!/bin/bash
+# Entry point, run once at first boot by user-data.sh.tftpl.
+# Re-run by hand with: sudo /opt/harbor-bootstrap/bootstrap.sh
+source /opt/harbor-bootstrap/lib.sh
+
+DONE_MARKER=/var/lib/harbor-bootstrap.done
+if [[ -f $DONE_MARKER ]]; then
+  log "Already bootstrapped ($DONE_MARKER exists), nothing to do"
+  exit 0
+fi
+
+"$SCRIPT_DIR/node-prep.sh"
+"$SCRIPT_DIR/harbor.sh"
+"$SCRIPT_DIR/harbor-nginx.sh"
+
+touch "$DONE_MARKER"
+log "Bootstrap finished"
