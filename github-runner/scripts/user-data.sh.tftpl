@@ -1,0 +1,26 @@
+#!/bin/bash
+# Terraform renders this template once per instance (templatefile in compute.tf).
+# It writes the runner's settings and the scripts from this folder to disk, then
+# runs bootstrap.sh. Output goes to /var/log/github-runner-bootstrap.log.
+# No tokens here: runner.sh reads the GitHub token from Secrets Manager.
+set -euo pipefail
+mkdir -p /etc/github-runner-bootstrap /opt/github-runner-bootstrap
+
+cat >/etc/github-runner-bootstrap/env <<'GR_ENV_EOF'
+AWS_REGION="${aws_region}"
+RUNNER_NAME="${runner_name}"
+GITHUB_SCOPE="${github_scope}"
+RUNNER_LABELS="${runner_labels}"
+RUNNER_GROUP="${runner_group}"
+RUNNER_VERSION="${runner_version}"
+SECRET_ARN="${secret_arn}"
+GR_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/github-runner-bootstrap/${name} <<'GR_SCRIPT_EOF'
+${body}
+GR_SCRIPT_EOF
+chmod 0755 /opt/github-runner-bootstrap/${name}
+
+%{ endfor ~}
+/opt/github-runner-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/github-runner-bootstrap.log
