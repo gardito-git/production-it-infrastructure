@@ -24,6 +24,7 @@ is visible before the first backup.
 | `backups/postgres/` | **Managed by pgBackRest** (4 weekly fulls + WAL) | PostgreSQL primary |
 | `backups/redis/` | 30 days (`backup_retention_days`) | Redis master, daily: `backups/redis/redis-<time>.rdb.gz` |
 | `backups/elasticsearch/` | **Managed by Elasticsearch** (snapshot policy: 30 days) | Elasticsearch nodes, daily snapshot repository `s3-backups` |
+| `backups/mongodb/` | 30 days | daily snapshot repository `s3-backups` |
 | `tmp/` | 7 days | Scratch files |
 | `web/` | Until deleted | The web team's own files and backups |
 | anything else | Until deleted | `uploads/`, ... |

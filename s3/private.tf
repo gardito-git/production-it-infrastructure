@@ -76,7 +76,14 @@ resource "aws_s3_bucket_versioning" "private" {
 # These empty "folder" objects (what the S3 console's "Create folder" makes) only
 # make the backup layout visible before the first backup runs.
 resource "aws_s3_object" "backup_folders" {
-  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/", "backups/redis/", "backups/elasticsearch/", "backups/rabbitmq/", "backups/mongodb/"])
+  for_each = toset(["backups/", 
+  "backups/kubernetes/", 
+  "backups/postgres/", 
+  "backups/redis/", 
+  "backups/elasticsearch/", 
+  "backups/rabbitmq/", 
+  "backups/mongodb/"
+  ])
 
   bucket  = aws_s3_bucket.private.id
   key     = each.value
