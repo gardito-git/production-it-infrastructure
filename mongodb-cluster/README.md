@@ -16,6 +16,7 @@ first boot, so `terraform apply` is the only step.
   you (VPN) ────►│  :27017, :22                                                          │
                  └──────── daily mongodump from a secondary ─► S3 backups/mongodb/ ──────┘
 ```
+![MongoDB](mongodb_replica_set_ec2_cluster_architecture-bg.png)
 
 | | |
 |---|---|
