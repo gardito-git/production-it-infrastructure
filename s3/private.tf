@@ -6,6 +6,7 @@
 #   backups/redis/       daily RDB snapshots, deleted after var.backup_retention_days
 #   backups/elasticsearch/ snapshot repository; Elasticsearch (SLM) deletes old snapshots itself
 #   backups/rabbitmq/    daily definitions exports, deleted after var.backup_retention_days
+#   backups/mongodb/     daily mongodump archives, deleted after var.backup_retention_days
 #   tmp/                 deleted after 7 days
 #   anything else (uploads/, web/, ...) is kept until someone deletes it.
 
@@ -75,7 +76,7 @@ resource "aws_s3_bucket_versioning" "private" {
 # These empty "folder" objects (what the S3 console's "Create folder" makes) only
 # make the backup layout visible before the first backup runs.
 resource "aws_s3_object" "backup_folders" {
-  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/", "backups/redis/", "backups/elasticsearch/", "backups/rabbitmq/"])
+  for_each = toset(["backups/", "backups/kubernetes/", "backups/postgres/", "backups/redis/", "backups/elasticsearch/", "backups/rabbitmq/", "backups/mongodb/"])
 
   bucket  = aws_s3_bucket.private.id
   key     = each.value
@@ -95,7 +96,9 @@ locals {
     "backups/redis/" = var.backup_retention_days
     # Each RabbitMQ definitions export is complete on its own, too.
     "backups/rabbitmq/" = var.backup_retention_days
-    "tmp/"              = 7
+    # Each mongodump archive is a complete, self-contained backup.
+    "backups/mongodb/" = var.backup_retention_days
+    "tmp/"             = 7
   }
 }
 
