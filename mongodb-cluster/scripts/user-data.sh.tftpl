@@ -1,0 +1,29 @@
+#!/bin/bash
+# Terraform renders this template once per instance (templatefile in compute.tf).
+# It writes the node's settings and the scripts from this folder to disk, then
+# runs bootstrap.sh. Output goes to /var/log/mongodb-bootstrap.log.
+# No passwords here: the scripts read them from Secrets Manager at boot.
+set -euo pipefail
+mkdir -p /etc/mongodb-bootstrap /opt/mongodb-bootstrap
+
+cat >/etc/mongodb-bootstrap/env <<'MONGODB_ENV_EOF'
+NODE_INDEX="${node_index}"
+NODE_NAME="mongodb-${node_index + 1}"
+AWS_REGION="${aws_region}"
+NODE_IPS="${node_ips}"
+MONGODB_VERSION="${mongodb_version}"
+REPLICA_SET_NAME="${replica_set_name}"
+DATA_VOLUME_ID="${data_volume_id}"
+SECRET_ARN="${secret_arn}"
+BACKUP_BUCKET="${backup_bucket}"
+BACKUP_PREFIX="${backup_prefix}"
+MONGODB_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/mongodb-bootstrap/${name} <<'MONGODB_SCRIPT_EOF'
+${body}
+MONGODB_SCRIPT_EOF
+chmod 0755 /opt/mongodb-bootstrap/${name}
+
+%{ endfor ~}
+/opt/mongodb-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/mongodb-bootstrap.log

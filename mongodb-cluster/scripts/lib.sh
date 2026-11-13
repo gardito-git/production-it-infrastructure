@@ -1,0 +1,54 @@
+#!/bin/bash
+# Shared helpers, sourced by every other script in this folder.
+# /etc/mongodb-bootstrap/env is written by user-data.sh.tftpl at first boot.
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /etc/mongodb-bootstrap/env
+export AWS_DEFAULT_REGION="$AWS_REGION"
+export PATH="$PATH:/snap/bin:/usr/local/bin"
+export DEBIAN_FRONTEND=noninteractive
+export HOME=${HOME:-/root} # cloud-init runs user data without HOME; the AWS CLI needs it
+
+SCRIPT_DIR=/opt/mongodb-bootstrap
+APT=(apt-get -o DPkg::Lock::Timeout=600 -y -q)
+read -ra IPS <<<"$NODE_IPS"
+
+log() {
+  echo "[$(date -u +%FT%TZ)] [$NODE_NAME] $*"
+}
+
+die() {
+  log "ERROR: $*"
+  exit 1
+}
+
+# secret FIELD: read one field of the cluster's Secrets Manager secret.
+# Retries because new IAM permissions can take a minute to reach a fresh instance.
+secret() {
+  local attempt value
+  for attempt in {1..20}; do
+    if value=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" \
+      --query SecretString --output text 2>/dev/null); then
+      jq -er --arg f "$1" '.[$f]' <<<"$value" && return 0
+    fi
+    sleep 15
+  done
+  die "could not read $1 from $SECRET_ARN"
+}
+
+# mongo [HOST] JS: run JavaScript in mongosh against one member, directly (not
+# through the replica set). No login: only commands that need none, like hello.
+mongo() {
+  local host=127.0.0.1
+  [[ $# -gt 1 ]] && { host=$1; shift; }
+  mongosh --quiet --norc "mongodb://$host:27017/?directConnection=true" --eval "$1"
+}
+
+# mongo_admin JS: run JavaScript as admin on this member. The password comes in
+# through the environment, never on the command line (visible in ps).
+mongo_admin() {
+  MONGO_ADMIN_PASSWORD=$(secret admin_password) mongosh --quiet --norc \
+    "mongodb://127.0.0.1:27017/?directConnection=true" \
+    --eval "db.getSiblingDB('admin').auth('admin', process.env.MONGO_ADMIN_PASSWORD); $1"
+}
