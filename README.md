@@ -9,3 +9,4 @@ TO-DO
 7. RabbitMQ cluster on EC2 (3 nodes, quorum queues)
 8. GitHub Actions self-hosted runners on EC2 (3 runners)
 9. Harbor private container registry on EC2 with S3 storage
+10. MongoDB replica set on EC2 (3 members)

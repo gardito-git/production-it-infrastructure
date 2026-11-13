@@ -214,3 +214,20 @@ output "harbor_bucket_name" {
 output "harbor_secret_arn" {
   value = module.harbor.secret_arn
 }
+
+output "mongodb_connection_string" {
+  description = "Replace <user>/<password> with an app user"
+  value       = module.mongodb_cluster.connection_string
+}
+
+output "mongodb_node_private_ips" {
+  value = module.mongodb_cluster.node_private_ips
+}
+
+output "mongodb_secret_arn" {
+  value = module.mongodb_cluster.secret_arn
+}
+
+output "mongodb_backup_location" {
+  value = module.mongodb_cluster.backup_location
+}
