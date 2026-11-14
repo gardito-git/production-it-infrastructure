@@ -1,4 +1,4 @@
-# AWS Production IT Infrastructure
+# Self-Managed AWS Production Platform (Terraform)
 
 **A complete, self-managed production platform on AWS, written in Terraform.** Kubernetes,
 databases, messaging, search, a frontend, CI runners and a private container registry, all
