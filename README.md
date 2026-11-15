@@ -22,10 +22,15 @@ failover, backups, least-privilege access and no secrets in code.
 | Amazon ElastiCache | Redis 8 with Sentinel | [`redis-sentinel`](redis-sentinel/) |
 | Amazon OpenSearch Service | Elasticsearch 9 and Kibana | [`elasticsearch-cluster`](elasticsearch-cluster/) |
 | Amazon MQ / SQS | RabbitMQ 4 with quorum queues | [`rabbitmq-cluster`](rabbitmq-cluster/) |
-| MongoDB Atlas / DynamoDB | MongoDB 8 replica set | [`mongodb-cluster`](mongodb-cluster/) |
 | AWS Amplify / Vercel | Next.js on EC2 with PM2, S3 and CloudFront | [`nextjs-pm2-frontend`](nextjs-pm2-frontend/) |
 | Amazon ECR / Docker Hub | Harbor private registry with S3 storage | [`harbor`](harbor/) |
 | GitHub-hosted runners (for VPC access) | Self-hosted GitHub Actions runners | [`github-runner`](github-runner/) |
+---
+Optional
+| Managed service | Replaced by | Module |
+|---|---|---|
+| MongoDB Atlas / DynamoDB | MongoDB 8, replica set | [`mongodb-cluster`](mongodb-cluster/) |
+| Amazon Cloudwatch | PMM Grafana Dashboard | [`pmm-grafana-dashboard`](pmm-grafana-dashboard/) |
 
 ## Architecture
 
