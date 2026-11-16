@@ -17,7 +17,7 @@ locals {
 
 resource "aws_s3_bucket" "frontend" {
   # Bucket names are global across all AWS accounts; the account ID avoids collisions.
-  bucket        = "${local.name_prefix}-frontend-${local.account_id}"
+  bucket        = "${local.name_prefix}-frontend"
   force_destroy = false
 
   tags = {
