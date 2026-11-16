@@ -80,3 +80,12 @@ variable "policy_arns" {
   default     = {}
   description = "Extra IAM policies for the runners' role, e.g. { frontend_deployer = module.nextjs_frontend.deployer_policy_arn }. Keys are just names."
 }
+
+variable "monitoring" {
+  type = object({
+    agent_script = string
+    policy_arn   = string
+  })
+  default     = null
+  description = "Monitoring agents from the pmm-grafana-dashboard module (module.pmm_grafana_dashboard.agent). null = no agents."
+}

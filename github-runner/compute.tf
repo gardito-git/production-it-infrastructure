@@ -18,10 +18,14 @@ data "aws_region" "current" {}
 locals {
   # Every *.sh in scripts/ is copied onto each runner by user-data.sh.tftpl.
   # replace() strips Windows line endings (CRLF), which would break bash on Linux.
-  bootstrap_scripts = {
-    for f in fileset("${path.module}/scripts", "*.sh") :
-    f => replace(file("${path.module}/scripts/${f}"), "\r\n", "\n")
-  }
+  bootstrap_scripts = merge(
+    {
+      for f in fileset("${path.module}/scripts", "*.sh") :
+      f => replace(file("${path.module}/scripts/${f}"), "\r\n", "\n")
+    },
+    # The monitoring agent installer (pmm-grafana-dashboard module), when enabled.
+    var.monitoring == null ? {} : { "monitoring-agent.sh" = replace(var.monitoring.agent_script, "\r\n", "\n") },
+  )
 }
 
 # Your public key, installed for user "ubuntu". Connect to the VPN, then: ssh ubuntu@<private-ip>
