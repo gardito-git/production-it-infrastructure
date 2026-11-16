@@ -70,6 +70,10 @@ bootstrap:
         archive_command: "pgbackrest --stanza=main archive-push %p"
         password_encryption: scram-sha-256
         random_page_cost: 1.1
+        # Query statistics for PMM's Query Analytics (needs a restart to change).
+        shared_preload_libraries: pg_stat_statements
+        pg_stat_statements.track: all
+        track_io_timing: "on"
         effective_io_concurrency: 200
   initdb:
     - encoding: UTF8

@@ -15,5 +15,12 @@ fi
 "$SCRIPT_DIR/patroni.sh"
 "$SCRIPT_DIR/pgbackrest.sh"
 
+# Monitoring agents (pmm-grafana-dashboard module), when enabled. A failure here
+# never stops the bootstrap: the server works, it just isn't monitored yet.
+if [[ -x $SCRIPT_DIR/monitoring-agent.sh ]]; then
+  "$SCRIPT_DIR/monitoring-agent.sh" install "$NODE_NAME" postgresql "" "$SCRIPT_DIR/monitoring-services.sh" ||
+    log "WARNING: monitoring agent setup failed; see above"
+fi
+
 touch "$DONE_MARKER"
 log "Bootstrap finished"
