@@ -1,0 +1,95 @@
+# Installs the monitoring agents on servers that were created BEFORE the
+# monitoring module (Terraform only runs first-boot scripts on new servers).
+# New servers install the agents by themselves; running this on them is harmless.
+#
+# From WSL or Linux, connected to the VPN, in this folder:
+#   terraform -chdir=../.. output -raw monitoring_agent_script > agent.sh
+#   ansible-galaxy collection install amazon.aws
+#   ansible-playbook install-agents.yml -e project=example -e env=dev -e region=us-east-1
+#
+# Each server is matched by its Name tag (<project>-<env>-<role>-<n>) to the
+# service it runs, the log files to ship and its module's PMM hook.
+- name: Install monitoring agents (PMM client + Grafana Alloy)
+  hosts: all
+  become: true
+  gather_facts: false
+  serial: 5
+
+  vars:
+    agent_script: "{{ playbook_dir }}/agent.sh"
+    modules_dir: "{{ playbook_dir }}/../.."
+    name_prefix: "{{ project }}-{{ env }}-"
+    # Name tag (after the prefix) starts with -> settings.
+    profiles:
+      control-plane-: { service: kubernetes, logs: "", module: kubernetes-cluster, dir: /opt/k8s-bootstrap, name_prefix: "k8s-" }
+      worker-:        { service: kubernetes, logs: "", module: kubernetes-cluster, dir: /opt/k8s-bootstrap, name_prefix: "k8s-" }
+      etcd-:          { service: kubernetes, logs: "", module: kubernetes-cluster, dir: /opt/k8s-bootstrap, name_prefix: "k8s-" }
+      pg-:            { service: postgresql, logs: "", module: postgres-cluster, dir: /opt/pg-bootstrap }
+      redis-:         { service: redis, logs: "", module: redis-sentinel, dir: /opt/redis-bootstrap }
+      es-master-:     { service: elasticsearch, logs: "/var/log/elasticsearch/*.log", module: elasticsearch-cluster, dir: /opt/es-bootstrap }
+      es-data-:       { service: elasticsearch, logs: "/var/log/elasticsearch/*.log", module: elasticsearch-cluster, dir: /opt/es-bootstrap }
+      kibana:         { service: elasticsearch, logs: "/var/log/kibana/*.log", module: elasticsearch-cluster, dir: /opt/es-bootstrap }
+      rabbitmq-:      { service: rabbitmq, logs: "/var/log/rabbitmq/*.log", module: rabbitmq-cluster, dir: /opt/rabbitmq-bootstrap }
+      mongodb-:       { service: mongodb, logs: "/var/log/mongodb/mongod.log", module: mongodb-cluster, dir: /opt/mongodb-bootstrap }
+      web-:           { service: nginx, logs: "/var/log/nginx/*.log", module: web-server, dir: /opt/web-bootstrap }
+      frontend-:      { service: nextjs, logs: "/home/frontend/.pm2/logs/*.log", module: "", dir: "" }
+      runner-:        { service: github-runner, logs: "/home/runner/actions-runner/_diag/*.log", module: "", dir: "" }
+      harbor:         { service: harbor, logs: "/var/log/harbor/*.log /var/log/nginx/*.log", module: harbor, dir: /opt/harbor-bootstrap }
+
+  tasks:
+    - name: Check the inputs
+      run_once: true
+      delegate_to: localhost
+      become: false
+      ansible.builtin.assert:
+        that:
+          - project is defined
+          - env is defined
+          - agent_script is file
+        fail_msg: "Pass -e project=... -e env=..., and create agent.sh (see the top of this file)"
+
+    - name: Work out this server's role
+      ansible.builtin.set_fact:
+        node_suffix: "{{ inventory_hostname | replace(name_prefix, '', 1) }}"
+
+    - name: Pick its profile
+      ansible.builtin.set_fact:
+        profile: "{{ item.value }}"
+      loop: "{{ profiles | dict2items }}"
+      when: node_suffix.startswith(item.key)
+
+    - name: Skip servers this playbook doesn't know (e.g. the monitoring server)
+      ansible.builtin.meta: end_host
+      when: profile is not defined
+
+    - name: Copy the agent installer
+      ansible.builtin.copy:
+        src: "{{ agent_script }}"
+        dest: /usr/local/sbin/monitoring-agent-install
+        mode: "0755"
+
+    - name: Copy the module's PMM hook
+      when: profile.module != ""
+      block:
+        - name: Make sure the folder exists
+          ansible.builtin.file:
+            path: "{{ profile.dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: Copy monitoring-services.sh
+          ansible.builtin.copy:
+            src: "{{ modules_dir }}/{{ profile.module }}/scripts/monitoring-services.sh"
+            dest: "{{ profile.dir }}/monitoring-services.sh"
+            mode: "0755"
+
+    - name: Install and register the agents
+      ansible.builtin.command:
+        argv:
+          - /usr/local/sbin/monitoring-agent-install
+          - install
+          - "{{ inventory_hostname if profile.service == 'github-runner' else (profile.name_prefix | default('')) ~ node_suffix }}"
+          - "{{ profile.service }}"
+          - "{{ profile.logs }}"
+          - "{{ (profile.dir ~ '/monitoring-services.sh') if profile.module != '' else '' }}"
+        creates: /etc/monitoring-agent/env

@@ -1,0 +1,19 @@
+# Dynamic inventory: every running server of this project and environment,
+# named by its Name tag and reached by private IP over the VPN.
+# Needs AWS credentials allowed to ec2:DescribeInstances, and boto3.
+#
+#   ansible-inventory --graph
+plugin: amazon.aws.aws_ec2
+
+# EDIT these to match terraform.tfvars (region, project_name, environment).
+regions:
+  - us-east-1
+filters:
+  tag:Project: example
+  tag:Environment: dev
+  instance-state-name: running
+
+hostnames:
+  - tag:Name
+compose:
+  ansible_host: private_ip_address
