@@ -57,3 +57,11 @@ resource "aws_iam_instance_profile" "node" {
   name = "${var.project_name}-${var.environment}-${each.key}"
   role = aws_iam_role.node[each.key].name
 }
+
+# Monitoring agents may read their PMM registration token (pmm-grafana-dashboard module).
+resource "aws_iam_role_policy_attachment" "monitoring" {
+  for_each = var.monitoring == null ? {} : aws_iam_role.node # every node role
+
+  role       = each.value.name
+  policy_arn = var.monitoring.policy_arn
+}
