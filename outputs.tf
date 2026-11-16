@@ -231,3 +231,28 @@ output "mongodb_secret_arn" {
 output "mongodb_backup_location" {
   value = module.mongodb_cluster.backup_location
 }
+
+output "monitoring_url" {
+  description = "Grafana/PMM, over the VPN (admin password in monitoring_admin_secret_arn)"
+  value       = module.pmm_grafana_dashboard.url
+}
+
+output "monitoring_private_ip" {
+  value = module.pmm_grafana_dashboard.private_ip
+}
+
+output "monitoring_admin_secret_arn" {
+  value = module.pmm_grafana_dashboard.admin_secret_arn
+}
+
+output "monitoring_github_secret_arn" {
+  description = "Put the GitHub OAuth app's client_id and client_secret here"
+  value       = module.pmm_grafana_dashboard.github_secret_arn
+}
+
+output "monitoring_agent_script" {
+  description = "Agent installer for servers that already exist (pmm-grafana-dashboard/ansible)"
+  value       = module.pmm_grafana_dashboard.agent_script
+  sensitive   = true
+}
+

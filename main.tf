@@ -24,6 +24,9 @@ module "web_server" {
   project_name = var.project_name
   environment  = var.environment
 
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
+
   vpc_id             = module.vpc.vpc_id
   vpc_cidr           = module.vpc.vpc_cidr
   private_subnet_ids = module.vpc.private_subnet_ids # internal ALB and servers
@@ -42,6 +45,9 @@ module "kubernetes_cluster" {
 
   project_name = var.project_name
   environment  = var.environment
+
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
 
   vpc_id               = module.vpc.vpc_id
   vpc_cidr             = module.vpc.vpc_cidr
@@ -62,6 +68,9 @@ module "postgres_cluster" {
   project_name = var.project_name
   environment  = var.environment
 
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
+
   vpc_id               = module.vpc.vpc_id
   vpc_cidr             = module.vpc.vpc_cidr
   private_subnet_ids   = module.vpc.private_subnet_ids
@@ -81,6 +90,9 @@ module "redis_sentinel" {
   project_name = var.project_name
   environment  = var.environment
 
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
+
   vpc_id               = module.vpc.vpc_id
   vpc_cidr             = module.vpc.vpc_cidr
   private_subnet_ids   = module.vpc.private_subnet_ids
@@ -98,6 +110,9 @@ module "elasticsearch_cluster" {
 
   project_name = var.project_name
   environment  = var.environment
+
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
 
   vpc_id               = module.vpc.vpc_id
   vpc_cidr             = module.vpc.vpc_cidr
@@ -117,6 +132,9 @@ module "nextjs_frontend" {
 
   project_name = var.project_name
   environment  = var.environment
+
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
 
   vpc_id               = module.vpc.vpc_id
   private_subnet_ids   = module.vpc.private_subnet_ids
@@ -144,6 +162,9 @@ module "rabbitmq_cluster" {
   project_name = var.project_name
   environment  = var.environment
 
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
+
   vpc_id               = module.vpc.vpc_id
   vpc_cidr             = module.vpc.vpc_cidr
   private_subnet_ids   = module.vpc.private_subnet_ids
@@ -162,6 +183,9 @@ module "github_runner" {
 
   project_name = var.project_name
   environment  = var.environment
+
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
 
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
@@ -184,6 +208,9 @@ module "harbor" {
   project_name = var.project_name
   environment  = var.environment
 
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
+
   vpc_id           = module.vpc.vpc_id
   vpc_cidr         = module.vpc.vpc_cidr
   public_subnet_id = module.vpc.public_subnet_ids[0] # the server has an Elastic IP
@@ -201,6 +228,9 @@ module "mongodb_cluster" {
   project_name = var.project_name
   environment  = var.environment
 
+  # Monitoring agents: PMM metrics and logs to Loki (pmm-grafana-dashboard).
+  monitoring = module.pmm_grafana_dashboard.agent
+
   vpc_id               = module.vpc.vpc_id
   vpc_cidr             = module.vpc.vpc_cidr
   private_subnet_ids   = module.vpc.private_subnet_ids
@@ -212,4 +242,25 @@ module "mongodb_cluster" {
 
   ssh_public_key               = var.ssh_public_key
   ssh_source_security_group_id = module.vpc.vpn_security_group_id
+}
+
+module "pmm_grafana_dashboard" {
+  source = "./pmm-grafana-dashboard"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  vpc_id            = module.vpc.vpc_id
+  vpc_cidr          = module.vpc.vpc_cidr
+  private_subnet_id = module.vpc.private_subnet_ids[0] # fixed IP .110
+
+  # UI name inside the VPC and on the VPN.
+  domain_name = "monitoring.internal"
+
+  # "Sign in with GitHub" for members of the runners' organization (an "org/repo"
+  # scope has no organization, so then only Grafana's own users).
+  github_organization = strcontains(var.github_runner_scope, "/") ? null : var.github_runner_scope
+
+  ssh_public_key        = var.ssh_public_key
+  vpn_security_group_id = module.vpc.vpn_security_group_id
 }
