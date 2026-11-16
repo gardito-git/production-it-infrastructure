@@ -107,6 +107,8 @@ resource "aws_ebs_volume" "data" {
   availability_zone = data.aws_subnet.private.availability_zone
   type              = "gp3"
   size              = 100
+  iops              = 3000
+  throughput        = 250 # Double the default 125 MiB/s, so Loki can keep up with the logs from all servers.
   encrypted         = true
 
   tags = {
