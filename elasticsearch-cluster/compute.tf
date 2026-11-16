@@ -36,10 +36,14 @@ locals {
 
   # Every *.sh in scripts/ is copied onto each node by user-data.sh.tftpl.
   # replace() strips Windows line endings (CRLF), which would break bash on Linux.
-  bootstrap_scripts = {
-    for f in fileset("${path.module}/scripts", "*.sh") :
-    f => replace(file("${path.module}/scripts/${f}"), "\r\n", "\n")
-  }
+  bootstrap_scripts = merge(
+    {
+      for f in fileset("${path.module}/scripts", "*.sh") :
+      f => replace(file("${path.module}/scripts/${f}"), "\r\n", "\n")
+    },
+    # The monitoring agent installer (pmm-grafana-dashboard module), when enabled.
+    var.monitoring == null ? {} : { "monitoring-agent.sh" = replace(var.monitoring.agent_script, "\r\n", "\n") },
+  )
 
   user_data_vars = {
     cluster_name    = "${local.name_prefix}-es"

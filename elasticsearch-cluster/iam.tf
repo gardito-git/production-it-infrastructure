@@ -85,3 +85,11 @@ resource "aws_iam_role_policy" "snapshots" {
   role   = aws_iam_role.node["elasticsearch"].name
   policy = data.aws_iam_policy_document.snapshots.json
 }
+
+# Monitoring agents may read their PMM registration token (pmm-grafana-dashboard module).
+resource "aws_iam_role_policy_attachment" "monitoring" {
+  for_each = var.monitoring == null ? {} : aws_iam_role.node # every node role
+
+  role       = each.value.name
+  policy_arn = var.monitoring.policy_arn
+}

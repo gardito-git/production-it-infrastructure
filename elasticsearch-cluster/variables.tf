@@ -128,3 +128,12 @@ variable "data_node_count" {
 #   default     = "c8i.large"
 #   description = "Instance type of the Kibana node"
 # }
+
+variable "monitoring" {
+  type = object({
+    agent_script = string
+    policy_arn   = string
+  })
+  default     = null
+  description = "Monitoring agents from the pmm-grafana-dashboard module (module.pmm_grafana_dashboard.agent). null = no agents."
+}
