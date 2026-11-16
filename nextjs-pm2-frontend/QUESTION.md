@@ -119,6 +119,23 @@ images longer.
 
 > Answer:
 
+## 7. Application metrics (monitoring)
+
+Our monitoring (PMM + Grafana) already shows each Next.js server's CPU, memory and disk, and
+ships the PM2 logs to Loki. It can't see inside the app: request rates, response times, errors
+per route, or business numbers.
+
+**7.1** Do you want app-level metrics? If yes, the usual way is `prom-client` (or OpenTelemetry)
+exposing Prometheus metrics on a local port, e.g. `127.0.0.1:9464/metrics`; we then register that
+port with PMM. Which library would you prefer, and which numbers matter most to you?
+
+> Answer:
+
+**7.2** Should the app log in JSON (one object per line)? Then logs can be searched by field in
+Grafana (e.g. `status=500`, `route=/checkout`).
+
+> Answer:
+
 ---
 
 Questions back to us? Ask the Infrastructure team. Thanks! 🙏
