@@ -38,7 +38,7 @@ variable "vpn_security_group_id" {
 
 variable "domain_name" {
   type        = string
-  default     = "monitoring.internal"
+  # default     = "monitoring.internal" # TO-DO
   description = "Private name of the Grafana/PMM UI, resolved inside the VPC and on the VPN. .internal is reserved for private use."
 }
 
