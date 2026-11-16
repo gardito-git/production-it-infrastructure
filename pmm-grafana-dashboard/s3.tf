@@ -10,7 +10,7 @@ locals {
 
 resource "aws_s3_bucket" "loki" {
   # Bucket names are global across all AWS accounts; the account ID avoids collisions.
-  bucket        = "${local.name_prefix}-loki-${data.aws_caller_identity.current.account_id}"
+  bucket        = "${local.name_prefix}-loki-"
   force_destroy = false
 
   tags = {
