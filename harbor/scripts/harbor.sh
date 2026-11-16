@@ -35,6 +35,8 @@ config.pop("https", None)  # TLS ends at the host's Nginx
 config["harbor_admin_password"] = os.environ["HARBOR_ADMIN_PASSWORD"]
 config["database"]["password"] = os.environ["HARBOR_DB_PASSWORD"]
 config["data_volume"] = os.environ["DATA_DIR"]
+# Prometheus metrics for monitoring (localhost:9090/metrics, see below).
+config["metric"] = {"enabled": True, "port": 9090, "path": "/metrics"}
 # No access keys: the registry uses the instance's IAM role.
 config["storage_service"] = {
     "s3": {
@@ -58,6 +60,8 @@ log "Generating Harbor's configuration"
 # Nginx should reach it, and Nginx is what enforces the access rules.
 sed -i -E 's/^( *- )(")?8080:8080(")?$/\1127.0.0.1:8080:8080/' docker-compose.yml
 grep -q '127.0.0.1:8080:8080' docker-compose.yml || die "could not bind Harbor to localhost in docker-compose.yml"
+# Same for the metrics port: only the local monitoring agent reads it.
+sed -i -E 's/^( *- )(")?9090:9090(")?$/\1127.0.0.1:9090:9090/' docker-compose.yml
 
 # Docker restarts the containers after a reboot on its own, but in any order.
 # This also makes sure /data is mounted first.

@@ -13,5 +13,12 @@ fi
 "$SCRIPT_DIR/harbor.sh"
 "$SCRIPT_DIR/harbor-nginx.sh"
 
+# Monitoring agents (pmm-grafana-dashboard module), when enabled. A failure here
+# never stops the bootstrap: the server works, it just isn't monitored yet.
+if [[ -x $SCRIPT_DIR/monitoring-agent.sh ]]; then
+  "$SCRIPT_DIR/monitoring-agent.sh" install harbor harbor "/var/log/harbor/*.log /var/log/nginx/*.log" "$SCRIPT_DIR/monitoring-services.sh" ||
+    log "WARNING: monitoring agent setup failed; see above"
+fi
+
 touch "$DONE_MARKER"
 log "Bootstrap finished"
