@@ -42,3 +42,11 @@ resource "aws_iam_role_policy" "mongodb" {
   role   = aws_iam_role.mongodb.name
   policy = data.aws_iam_policy_document.mongodb.json
 }
+
+# Monitoring agents may read their PMM registration token (pmm-grafana-dashboard module).
+resource "aws_iam_role_policy_attachment" "monitoring" {
+  count = var.monitoring == null ? 0 : 1
+
+  role       = aws_iam_role.mongodb.name
+  policy_arn = var.monitoring.policy_arn
+}

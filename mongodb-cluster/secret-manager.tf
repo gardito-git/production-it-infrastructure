@@ -21,6 +21,12 @@ resource "random_password" "backup" {
 
 # MongoDB keyfiles: 6-1024 characters from the base64 set. Letters and digits
 # qualify.
+# PMM's monitoring user, created by monitoring-services.sh.
+resource "random_password" "pmm" {
+  length  = 32
+  special = false
+}
+
 resource "random_password" "keyfile" {
   length  = 756
   special = false
@@ -41,6 +47,8 @@ resource "aws_secretsmanager_secret_version" "mongodb" {
     admin_password  = random_password.admin.result
     backup_username = "backup"
     backup_password = random_password.backup.result
+    pmm_username    = "pmm"
+    pmm_password    = random_password.pmm.result
     keyfile         = random_password.keyfile.result
     replica_set     = var.replica_set_name
     hosts           = [for ip in local.node_ips : "${ip}:27017"]
