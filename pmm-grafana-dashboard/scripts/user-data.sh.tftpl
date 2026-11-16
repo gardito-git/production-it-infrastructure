@@ -1,0 +1,32 @@
+#!/bin/bash
+# Terraform renders this template (templatefile in compute.tf). It writes the
+# server's settings and the scripts from this folder to disk, then runs
+# bootstrap.sh. Output goes to /var/log/monitoring-bootstrap.log.
+# No passwords here: the scripts read them from Secrets Manager at boot.
+set -euo pipefail
+mkdir -p /etc/monitoring-bootstrap /opt/monitoring-bootstrap
+
+cat >/etc/monitoring-bootstrap/env <<'MON_ENV_EOF'
+AWS_REGION="${aws_region}"
+DOMAIN_NAME="${domain_name}"
+ENVIRONMENT="${environment}"
+GITHUB_ORGANIZATION="${github_organization}"
+PMM_VERSION="${pmm_version}"
+LOKI_VERSION="${loki_version}"
+PROMETHEUS_VERSION="${prometheus_version}"
+RETENTION_DAYS="${retention_days}"
+LOKI_BUCKET="${loki_bucket}"
+DATA_VOLUME_ID="${data_volume_id}"
+ADMIN_SECRET_ARN="${admin_secret_arn}"
+AGENT_TOKEN_SECRET_ARN="${agent_token_secret}"
+GITHUB_SECRET_ARN="${github_secret_arn}"
+MON_ENV_EOF
+
+%{ for name, body in scripts ~}
+cat >/opt/monitoring-bootstrap/${name} <<'MON_SCRIPT_EOF'
+${body}
+MON_SCRIPT_EOF
+chmod 0755 /opt/monitoring-bootstrap/${name}
+
+%{ endfor ~}
+/opt/monitoring-bootstrap/bootstrap.sh 2>&1 | tee -a /var/log/monitoring-bootstrap.log

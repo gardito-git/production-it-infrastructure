@@ -183,4 +183,15 @@ if CURRENT=$(aws s3 cp --only-show-errors "s3://${bucket_name}/releases/CURRENT"
 else
   echo "No release yet. Upload one with scripts/release.sh, then: sudo deploy-frontend <version>"
 fi
+%{ if monitoring_agent_script != "" ~}
+
+# Monitoring agents (pmm-grafana-dashboard module): Linux metrics and logs,
+# including the PM2 logs of the Next.js processes.
+cat >/usr/local/sbin/monitoring-agent-install <<'MON_AGENT_EOF'
+${monitoring_agent_script}
+MON_AGENT_EOF
+chmod 0755 /usr/local/sbin/monitoring-agent-install
+/usr/local/sbin/monitoring-agent-install install "${node_name}" nextjs "/home/frontend/.pm2/logs/*.log" ||
+  echo "WARNING: monitoring agent setup failed; see above"
+%{ endif ~}
 echo "Bootstrap finished"
