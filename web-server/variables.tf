@@ -59,3 +59,12 @@ variable "nextjs_server_names" {
   default     = []
   description = "Domains Nginx serves the Next.js site for, e.g. [\"example.com\", \"www.example.com\"]. *.cloudfront.net is always added."
 }
+
+variable "monitoring" {
+  type = object({
+    agent_script = string
+    policy_arn   = string
+  })
+  default     = null
+  description = "Monitoring agents from the pmm-grafana-dashboard module (module.pmm_grafana_dashboard.agent). null = no agents."
+}

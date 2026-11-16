@@ -34,6 +34,7 @@ resource "aws_instance" "web_server" {
   subnet_id                   = var.private_subnet_ids[count.index % length(var.private_subnet_ids)] # one per AZ
   vpc_security_group_ids      = [aws_security_group.web_server.id]
   key_name                    = aws_key_pair.web_server.key_name
+  iam_instance_profile        = aws_iam_instance_profile.web_server.name
   associate_public_ip_address = false
 
   # IMDSv2 only.
@@ -51,7 +52,9 @@ resource "aws_instance" "web_server" {
   }
 
   # replace() strips Windows line endings (CRLF), which would break bash on Linux.
-  user_data = replace(templatefile("${path.module}/scripts/nginx.sh.tftpl", {
+  # gzip: with the monitoring agent the script is close to EC2's 16 KB user data
+  # limit; cloud-init unpacks it.
+  user_data_base64 = base64gzip(replace(templatefile("${path.module}/scripts/nginx.sh.tftpl", {
     vpc_cidr         = var.vpc_cidr
     nextjs_site_name = local.nextjs_site_name
     # The Next.js reverse-proxy site; empty when there are no upstreams.
@@ -60,7 +63,11 @@ resource "aws_instance" "web_server" {
       server_names = var.nextjs_server_names
       app_port     = split(":", var.nextjs_upstreams[0])[1]
     })
-  }), "\r\n", "\n")
+    # Monitoring agents (pmm-grafana-dashboard module); empty = none.
+    node_name               = "web-${count.index + 1}"
+    monitoring_agent_script = var.monitoring == null ? "" : replace(var.monitoring.agent_script, "\r\n", "\n")
+    monitoring_hook         = replace(file("${path.module}/scripts/monitoring-services.sh"), "\r\n", "\n")
+  }), "\r\n", "\n"))
 
   tags = {
     Name = "${local.name_prefix}-web-${count.index + 1}"
@@ -72,8 +79,9 @@ resource "aws_instance" "web_server" {
 
   lifecycle {
     ignore_changes = [
-      ami,       # A newer Ubuntu AMI must never silently replace a running server.
-      user_data, # Script edits only apply to new servers.
+      ami,              # A newer Ubuntu AMI must never silently replace a running server.
+      user_data,        # Script edits only apply to new servers.
+      user_data_base64, # (both names: older servers were created with plain user_data)
     ]
   }
 }
