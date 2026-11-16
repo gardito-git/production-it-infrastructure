@@ -57,3 +57,18 @@ nginx -t
 systemctl enable nginx
 systemctl reload-or-restart nginx
 echo "Nginx is running"
+%{ if monitoring_agent_script != "" ~}
+
+# Monitoring agents (pmm-grafana-dashboard module): Linux metrics, Nginx metrics
+# (stub_status exporter, monitoring-services.sh) and logs.
+mkdir -p /opt/web-bootstrap
+cat >/opt/web-bootstrap/monitoring-agent.sh <<'MON_AGENT_EOF'
+${monitoring_agent_script}
+MON_AGENT_EOF
+cat >/opt/web-bootstrap/monitoring-services.sh <<'MON_HOOK_EOF'
+${monitoring_hook}
+MON_HOOK_EOF
+chmod 0755 /opt/web-bootstrap/monitoring-agent.sh /opt/web-bootstrap/monitoring-services.sh
+/opt/web-bootstrap/monitoring-agent.sh install "${node_name}" nginx "/var/log/nginx/*.log" /opt/web-bootstrap/monitoring-services.sh ||
+  echo "WARNING: monitoring agent setup failed; see above"
+%{ endif ~}
