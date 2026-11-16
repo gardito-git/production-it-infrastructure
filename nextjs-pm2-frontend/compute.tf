@@ -69,7 +69,9 @@ resource "aws_instance" "frontend" {
   }
 
   # replace() strips Windows line endings (CRLF), which would break bash on Linux.
-  user_data = replace(templatefile("${path.module}/scripts/bootstrap.sh.tftpl", {
+  # gzip: with the monitoring agent the script is close to EC2's 16 KB user data
+  # limit; cloud-init unpacks it.
+  user_data_base64 = base64gzip(replace(templatefile("${path.module}/scripts/bootstrap.sh.tftpl", {
     region                = data.aws_region.current.region
     bucket_name           = aws_s3_bucket.frontend.id
     node_major            = 24 # Please adjust for your need.
@@ -79,7 +81,10 @@ resource "aws_instance" "frontend" {
     pm2_instances         = local.pm2_instances
     node_heap_mb          = var.node_heap_mb
     max_memory_restart_mb = var.max_memory_restart_mb
-  }), "\r\n", "\n")
+    # Monitoring agents (pmm-grafana-dashboard module); empty = none.
+    node_name               = "frontend-${count.index + 1}"
+    monitoring_agent_script = var.monitoring == null ? "" : replace(var.monitoring.agent_script, "\r\n", "\n")
+  }), "\r\n", "\n"))
 
   tags = {
     Name = "${local.name_prefix}-frontend-${count.index + 1}"
@@ -109,8 +114,9 @@ resource "aws_instance" "frontend" {
     }
 
     ignore_changes = [
-      ami,       # A newer Ubuntu AMI must never silently replace a running server.
-      user_data, # Script edits only apply to new servers.
+      ami,              # A newer Ubuntu AMI must never silently replace a running server.
+      user_data,        # Script edits only apply to new servers.
+      user_data_base64, # (both names: older servers were created with plain user_data)
     ]
   }
 }

@@ -146,3 +146,12 @@ variable "cloudfront_price_class" {
   default     = "PriceClass_200"
   description = "CloudFront edge locations. PriceClass_200 includes Asia; PriceClass_100 is cheaper but only North America and Europe."
 }
+
+variable "monitoring" {
+  type = object({
+    agent_script = string
+    policy_arn   = string
+  })
+  default     = null
+  description = "Monitoring agents from the pmm-grafana-dashboard module (module.pmm_grafana_dashboard.agent). null = no agents."
+}

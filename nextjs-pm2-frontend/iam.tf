@@ -83,3 +83,11 @@ resource "aws_iam_group_policy_attachment" "deployer" {
   group      = var.deployer_group_name
   policy_arn = aws_iam_policy.deployer.arn
 }
+
+# Monitoring agents may read their PMM registration token (pmm-grafana-dashboard module).
+resource "aws_iam_role_policy_attachment" "monitoring" {
+  count = var.monitoring == null ? 0 : 1
+
+  role       = aws_iam_role.frontend.name
+  policy_arn = var.monitoring.policy_arn
+}
