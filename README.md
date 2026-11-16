@@ -88,6 +88,7 @@ Every module also has its own architecture diagram in its README.
 | [`nextjs-pm2-frontend`](nextjs-pm2-frontend/) | 3 Next.js servers, S3 + CloudFront | Build once, rolling zero-downtime deploys with Ansible and `pm2 reload` |
 | [`github-runner`](github-runner/) | 3 self-hosted GitHub Actions runners | No inbound ports, IAM role instead of AWS keys, Docker and Ansible preinstalled |
 | [`harbor`](harbor/) | Harbor registry on EC2 + Elastic IP | Docker API public, web UI VPN-only via split-horizon DNS, image layers in S3, Let's Encrypt |
+| [`pmm-grafana-dashboard`](pmm-grafana-dashboard/) | PMM 3 + Grafana, Loki, Prometheus on one server | Agents on every server register themselves; database Query Analytics, logs in S3, Kubernetes dashboards |
 
 ## Design principles
 
@@ -120,6 +121,7 @@ The same patterns are applied in every module:
 **Infrastructure:** Terraform, AWS (EC2, VPC, Client VPN, ALB, NLB, CloudFront, S3, Route 53,
 Secrets Manager, IAM, EBS, Data Lifecycle Manager)
 **Platform:** Kubernetes (kubeadm, Cilium, etcd), Docker, Nginx, PM2, Ansible, GitHub Actions, Harbor
+**Observability:** Percona Monitoring and Management (PMM), Grafana, Prometheus, Loki, Grafana Alloy
 **Data:** PostgreSQL (Patroni, pgBackRest), Redis (Sentinel), Elasticsearch and Kibana, RabbitMQ, MongoDB
 **OS and scripting:** Ubuntu 24.04 LTS, Bash, systemd
 
@@ -134,7 +136,8 @@ Secrets Manager, IAM, EBS, Data Lifecycle Manager)
 ├── postgres-cluster/  redis-sentinel/  mongodb-cluster/  # databases
 ├── elasticsearch-cluster/  rabbitmq-cluster/             # search, messaging
 ├── web-server/  nextjs-pm2-frontend/                     # web tier
-└── github-runner/  harbor/                               # CI/CD and registry
+├── github-runner/  harbor/                               # CI/CD and registry
+└── pmm-grafana-dashboard/                                # monitoring: metrics and logs
 ```
 
 Each module has its own README: what it builds, how to use and operate it, and its inputs and outputs.
