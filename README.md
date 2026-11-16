@@ -162,9 +162,109 @@ terraform output -json vpn_client_configs | jq -r '.admin' > admin.ovpn
 `terraform output` lists every endpoint (Kubernetes API, database endpoints, Kibana, RabbitMQ,
 Harbor...) and the Secrets Manager ARNs that hold their passwords.
 
-> **Note:** this deploys a large environment (more than 40 EC2 instances). Review the plan and
+> **Note:** this deploys a large environment (45 EC2 instances, roughly $7,100 a month on-demand;
+> see [Estimated cost](#estimated-cost)). Review the plan and
 > the instance sizes in each module's `compute.tf` before applying, and destroy what you don't
 > need.
+
+## Estimated cost
+
+Rough monthly cost of the whole environment as defined in this repository, in **us-east-1**,
+**on-demand**, running 24/7 (730 hours a month). EC2 prices are from AWS's published on-demand
+price list (November 2026); the rest are AWS's standard list prices. Check your own setup with the
+[AWS Pricing Calculator](https://calculator.aws/) before relying on these numbers.
+
+| Module | Servers | EC2 | EBS (gp3) | Other | ≈ per month |
+|---|---|---:|---:|---|---:|
+| [`kubernetes-cluster`](kubernetes-cluster/) | 3 × c8i.xlarge, 6 × r8i.xlarge, 3 × c8i.large | $1,833 | 780 GB · $62 | NLB $16 | **$1,911** |
+| [`elasticsearch-cluster`](elasticsearch-cluster/) | 3 × c8i.xlarge, 6 × r8i.xlarge, 1 × c8i.large | $1,696 | 900 GB · $72 | | **$1,768** |
+| [`postgres-cluster`](postgres-cluster/) | 3 × r8i.xlarge | $608 | 690 GB · $55 | NLB $16 | **$680** |
+| [`nextjs-pm2-frontend`](nextjs-pm2-frontend/) | 3 × r8i.xlarge | $608 | 90 GB · $7 | | **$616** |
+| [`github-runner`](github-runner/) | 3 × c8i.xlarge | $410 | 300 GB · $24 | | **$434** |
+| [`mongodb-cluster`](mongodb-cluster/) | 3 × r8i.large | $304 | 390 GB · $31 | | **$335** |
+| [`redis-sentinel`](redis-sentinel/) | 3 × r8i.large | $304 | 240 GB · $19 | | **$323** |
+| [`rabbitmq-cluster`](rabbitmq-cluster/) | 3 × r8i.large | $304 | 90 GB · $7 | | **$311** |
+| [`web-server`](web-server/) | 3 × c8i.large | $205 | 90 GB · $7 | Internal ALB $16 | **$229** |
+| [`pmm-grafana-dashboard`](pmm-grafana-dashboard/) | 1 × r8i.xlarge | $203 | 130 GB · $10 | | **$213** |
+| [`harbor`](harbor/) | 1 × m8i.xlarge | $155 | 130 GB · $10 | Elastic IP $4 | **$169** |
+| [`vpc`](vpc/) | | | | NAT gateway $33, its IP $4, Client VPN subnet $73 | **$110** |
+| Shared | | | | Secrets Manager ~$5, Route 53 private zones $1 | **$6** |
+| **Total** | **45 servers** | **$6,631** | **3,830 GB · $306** | **$169** | **≈ $7,100 / month** |
+
+That's **about $85,000 a year** before usage-based charges.
+
+**Unit prices used:** c8i.large $68/month ($0.0937/h), c8i.xlarge $137 ($0.1874/h), r8i.large
+$101 ($0.1389/h), r8i.xlarge $203 ($0.2778/h), m8i.xlarge $155 ($0.2117/h); gp3 $0.08 per GB-month;
+load balancer $0.0225/h; NAT gateway $0.045/h; public IPv4 $0.005/h; Client VPN $0.10/h per
+associated subnet.
+
+### Not included (depends on usage)
+
+| Item | Price | Notes |
+|---|---|---|
+| Client VPN connections | $0.05 per connected user per hour | e.g. 10 people, 8 h × 22 days ≈ $88 |
+| Data between availability zones | $0.01/GB each way | Database replication and cluster traffic cross AZs by design |
+| Internet traffic out | $0.09/GB (first 10 TB) | Harbor pulls from outside AWS, API responses |
+| CloudFront | from $0.085/GB | Frontend and public assets |
+| NAT gateway data | $0.045/GB | Package downloads, external APIs (S3 skips it via the free endpoint) |
+| S3 | $0.023/GB-month + requests | Backups, Loki logs, Harbor images, frontend releases |
+| EBS snapshots | $0.05/GB-month | Harbor and monitoring daily snapshots (incremental) |
+| Load balancer capacity units | per LCU-hour | Small at low traffic |
+
+### Ways to lower it
+
+- **Savings Plans or Reserved Instances:** committing to 1 or 3 years of compute is the biggest
+  single saving for servers that run 24/7.
+- **The two largest modules** are Kubernetes and Elasticsearch (about half the bill together,
+  mostly their 6 × r8i.xlarge each). Size them to real load once it's measured.
+- **Non-production environments** (`dev`, `staging`) rarely need 3 of everything or 24/7 uptime:
+  smaller instance types, fewer nodes, or stopping them outside working hours.
+- **Graviton (ARM) instances** (e.g. r8g) cost less per hour, but the first-boot scripts download
+  `amd64` packages and binaries, so they'd need adapting first.
+
+### Compared with AWS managed services
+
+The same capacity on the managed service each module replaces, priced from AWS's official
+us-east-1 on-demand price lists (November 2026). Each managed option is the closest match in size
+and redundancy (3 nodes across 3 AZs); where a service doesn't offer Intel instances, its Graviton
+equivalent is used.
+
+| Service | Self-managed (this repo) | Managed equivalent | Managed | Difference |
+|---|---:|---|---:|---:|
+| PostgreSQL | $680 | RDS Multi-AZ DB cluster (writer + 2 readable standbys), db.r8gd.xlarge, 200 GB gp3 | $1,265 | **−$585** (−46%) |
+| Elasticsearch | $1,768 | OpenSearch Service: 3 × c7i.xlarge masters + 6 × r7i.xlarge data, 600 GB gp3 | $2,552 | **−$784** (−31%) |
+| RabbitMQ | $311 | Amazon MQ RabbitMQ 3-node cluster, mq.m7g.large | $599 | **−$287** (−48%) |
+| MongoDB | $335 | Amazon DocumentDB, 3 × db.r8g.large, 100 GB | $615 | **−$279** (−45%) |
+| Redis | $323 | ElastiCache, 3 × cache.r7g.large (Redis OSS) | $480 | **−$156** (−33%) |
+| Kubernetes | $1,911 | EKS control plane + the same 6 × r8i.xlarge workers | $1,338 | **+$574** (+43%) |
+| **Total** | **$5,330** | | **$6,848** | **−$1,518 / month** |
+
+**Self-managing these six services costs about $1,500 a month less (~$18,000 a year, 22%)** than
+their managed equivalents, at list prices.
+
+What the numbers say, honestly:
+
+- **The databases and brokers are where self-managing pays off:** roughly 30-50% cheaper each.
+- **Kubernetes is the exception.** EKS charges $73 a month for a managed control plane, while this
+  repository runs 3 control plane and 3 etcd servers (~$600). Self-managed Kubernetes here is a
+  choice for control and learning, not for cost.
+- **Harbor vs Amazon ECR:** ECR charges $0.10 per GB-month of images. At 500 GB that's ~$50 against
+  Harbor's ~$180 (server + S3), so **ECR is cheaper until roughly 2 TB of images**. Harbor's reasons
+  are data control and features (projects, scanning, replication), not price.
+
+What the comparison leaves out:
+
+- **People's time.** Managed services include patching, upgrades, backups, failover and AWS support.
+  Self-managed, that work is yours; even a few hours a month of an engineer's time can outweigh
+  the savings above.
+- **Sizes aren't identical.** Amazon MQ's mq.m7g.large has 8 GiB of RAM (our nodes have 16 GiB);
+  ElastiCache with Valkey instead of Redis OSS is about 20% cheaper ($384); DocumentDB is
+  MongoDB-*compatible*, not MongoDB, and also bills I/O ($0.20 per million requests).
+- **Traffic between zones.** Managed services don't bill their internal replication traffic;
+  self-managed clusters pay $0.01/GB each way between AZs.
+- **Not compared:** the Next.js frontend (Amplify/Vercel), the CI runners (GitHub-hosted minutes)
+  and monitoring (CloudWatch) are priced by usage, so they depend on traffic, build minutes and
+  data volume rather than on server sizes.
 
 ## Trade-offs
 
