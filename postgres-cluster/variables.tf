@@ -103,3 +103,12 @@ variable "backup_retention_full" {
   default     = 4
   description = "Number of weekly full backups pgBackRest keeps in S3 (4 = about a month of point-in-time restore)"
 }
+
+variable "monitoring" {
+  type = object({
+    agent_script = string
+    policy_arn   = string
+  })
+  default     = null
+  description = "Monitoring agents from the pmm-grafana-dashboard module (module.pmm_grafana_dashboard.agent). null = no agents."
+}

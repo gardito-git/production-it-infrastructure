@@ -15,6 +15,12 @@ resource "random_password" "replication" {
   special = false
 }
 
+# PMM's read-only monitoring user (role pg_monitor), created by monitoring-services.sh.
+resource "random_password" "pmm" {
+  length  = 32
+  special = false
+}
+
 resource "random_password" "patroni_api" {
   length  = 32
   special = false
@@ -37,6 +43,8 @@ resource "aws_secretsmanager_secret_version" "postgres" {
     replication_password = random_password.replication.result
     patroni_api_username = "patroni"
     patroni_api_password = random_password.patroni_api.result
+    pmm_username         = "pmm"
+    pmm_password         = random_password.pmm.result
     host                 = aws_lb.postgres.dns_name
     port                 = 5432 # read-write, always the primary
     read_only_port       = 5433 # replicas
