@@ -24,5 +24,12 @@ case "$NODE_ROLE/$NODE_INDEX" in
   *) die "unknown role/index: $NODE_ROLE/$NODE_INDEX" ;;
 esac
 
+# Monitoring agents (pmm-grafana-dashboard module), when enabled. A failure here
+# never stops the bootstrap: the server works, it just isn't monitored yet.
+if [[ -x $SCRIPT_DIR/monitoring-agent.sh ]]; then
+  "$SCRIPT_DIR/monitoring-agent.sh" install "k8s-$NODE_ROLE-$((NODE_INDEX + 1))" kubernetes "" "$SCRIPT_DIR/monitoring-services.sh" ||
+    log "WARNING: monitoring agent setup failed; see above"
+fi
+
 touch "$DONE_MARKER"
 log "Bootstrap finished"
