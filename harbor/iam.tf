@@ -77,3 +77,11 @@ resource "aws_iam_role_policy_attachment" "dlm" {
   role       = aws_iam_role.dlm.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
 }
+
+# Monitoring agents may read their PMM registration token (pmm-grafana-dashboard module).
+resource "aws_iam_role_policy_attachment" "monitoring" {
+  count = var.monitoring == null ? 0 : 1
+
+  role       = aws_iam_role.harbor.name
+  policy_arn = var.monitoring.policy_arn
+}

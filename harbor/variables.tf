@@ -74,3 +74,12 @@ variable "snapshot_retention_count" {
   default     = 30
   description = "Daily snapshots of the data volume to keep"
 }
+
+variable "monitoring" {
+  type = object({
+    agent_script = string
+    policy_arn   = string
+  })
+  default     = null
+  description = "Monitoring agents from the pmm-grafana-dashboard module (module.pmm_grafana_dashboard.agent). null = no agents."
+}
